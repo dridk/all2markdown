@@ -17,7 +17,7 @@ fn extract(file_path: &str, format: Option<&str>) -> PyResult<String> {
 
     let options = match format {
         Some(id) => all2markdown_core::Options::forcing(
-            all2markdown_core::Format::from_id(id)
+            all2markdown_core::format_from_id(id)
                 .ok_or_else(|| PyValueError::new_err(format!("unsupported format: {id}")))?,
         ),
         None => all2markdown_core::Options::default(),

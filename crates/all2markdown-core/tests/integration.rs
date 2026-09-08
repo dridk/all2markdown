@@ -1,5 +1,6 @@
 use all2markdown_core::{
-    detect_format, extract, Confidence, Extraction, Failure, Format, Options, SourceDocument,
+    detect_format, extract, format_from_id, Confidence, Extraction, Failure, Format, Options,
+    SourceDocument,
 };
 use std::path::Path;
 
@@ -60,6 +61,26 @@ fn detect_unknown_format() {
     // Parser's job; until then it is unrecognized.
     let source = SourceDocument::from_bytes(b"This is just plain text, not a document format!!");
     assert!(matches!(detect_format(&source), Err(Failure::UnrecognizedFormat)));
+}
+
+#[test]
+fn a_zip_that_is_no_docx_is_unrecognized() {
+    // The old central detector answered UnsupportedFormat("ZIP (not DOCX)")
+    // here. Once a Parser recognises only itself, no one is left to speak for
+    // ZIP in general: DocxParser answers No, and nothing else claims it.
+    let mut zip = b"PK\x03\x04".to_vec();
+    zip.extend_from_slice(b"not really an archive");
+    let source = SourceDocument::from_bytes(&zip);
+    assert!(matches!(detect_format(&source), Err(Failure::UnrecognizedFormat)));
+}
+
+#[test]
+fn a_signature_shorter_than_the_too_small_floor_still_wins() {
+    // FileTooSmall explains why nothing recognised a document; it no longer
+    // gates the poll, so a Parser is never pre-empted by a length rule it
+    // never agreed to.
+    let source = SourceDocument::from_bytes(b"%PDF");
+    assert_eq!(detect_format(&source).unwrap(), Format::PDF);
 }
 
 // ── DOC parser ────────────────────────────────────────────────────
@@ -209,16 +230,16 @@ fn forced_format_beats_detection() {
 
 #[test]
 fn format_from_id_is_case_insensitive() {
-    assert_eq!(Format::from_id("doc"), Some(Format::DOC));
-    assert_eq!(Format::from_id("DOCX"), Some(Format::DOCX));
-    assert_eq!(Format::from_id("Rtf"), Some(Format::RTF));
-    assert_eq!(Format::from_id(" PDF "), Some(Format::PDF));
+    assert_eq!(format_from_id("doc"), Some(Format::DOC));
+    assert_eq!(format_from_id("DOCX"), Some(Format::DOCX));
+    assert_eq!(format_from_id("Rtf"), Some(Format::RTF));
+    assert_eq!(format_from_id(" PDF "), Some(Format::PDF));
 }
 
 #[test]
 fn format_from_id_rejects_the_unknown() {
-    assert_eq!(Format::from_id("odt"), None);
-    assert_eq!(Format::from_id(""), None);
+    assert_eq!(format_from_id("odt"), None);
+    assert_eq!(format_from_id(""), None);
 }
 
 #[test]

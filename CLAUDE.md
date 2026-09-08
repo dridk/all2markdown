@@ -38,10 +38,14 @@ all2markdown -i file.doc -f doc > out.md      # explicit format
 
 Current state, being reshaped by milestone 1:
 
-- `FormatParser` trait in `strategy.rs`, one impl per format
-- Magic-byte detection in `detect.rs`, dispatch via a `match` in `lib.rs`.
-  Milestone 1 step 2 replaces both with a Parser registry, so that adding a
-  format touches one file instead of three.
+- `Parser` trait in `parser.rs`, one impl per format under `parsers/`
+- `Registry` in `registry.rs` holds the Parsers, polls every one of them for a
+  `Confidence` and keeps the highest, ties broken by registration order. It also
+  owns the id-to-Format lookup, since only it can know about a Parser registered
+  by a consumer of the crate.
+- Adding a format means one new file in `parsers/` plus its `mod` and
+  `register` lines in `parsers/mod.rs`; nothing else changes. A Parser written
+  outside this crate costs one `Registry::register` call and no edit here.
 - DOCX parser skips `RunChild::Drawing` and `RunChild::Shape` to exclude
   textbox text
 - DOC uses `unword`, DOCX uses `docx-rs`, RTF uses `rtf-parser`, PDF uses
@@ -49,7 +53,7 @@ Current state, being reshaped by milestone 1:
 
 ## Key Conventions
 
-- All parsers take `&[u8]` and return `Result<String, Error>`
+- A Parser takes a `&SourceDocument` and returns `Result<String, Failure>`
 - Output is Markdown with `#` headings where detectable, plain text otherwise
 - Say "extract", never "convert": the contract is text-first, not faithful
   conversion (ADR-0001)

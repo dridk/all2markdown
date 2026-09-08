@@ -1,13 +1,24 @@
+use crate::extraction::SourceDocument;
 use crate::failure::Failure;
-use crate::format::Format;
-use crate::strategy::FormatParser;
+use crate::format::{Confidence, Format};
+use crate::parser::Parser;
 use rtf_parser::Painter;
+
+const RTF_MAGIC: &[u8] = b"{\\rtf";
 
 pub struct RtfParser;
 
-impl FormatParser for RtfParser {
-    fn to_markdown(&self, data: &[u8]) -> Result<String, Failure> {
-        let text = std::str::from_utf8(data)
+impl Parser for RtfParser {
+    fn format(&self) -> Format {
+        Format::RTF
+    }
+
+    fn probe(&self, source: &SourceDocument<'_>) -> Confidence {
+        Confidence::certain_if(source.bytes.starts_with(RTF_MAGIC))
+    }
+
+    fn extract(&self, source: &SourceDocument<'_>) -> Result<String, Failure> {
+        let text = std::str::from_utf8(source.bytes)
             .map_err(|e| Failure::parse(Format::RTF, format!("not valid UTF-8: {e}")))?;
         let doc = rtf_parser::RtfDocument::try_from(text)
             .map_err(|e| Failure::parse(Format::RTF, format!("{e}")))?;

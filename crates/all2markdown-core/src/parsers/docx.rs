@@ -1,13 +1,29 @@
+use crate::extraction::SourceDocument;
 use crate::failure::Failure;
-use crate::format::Format;
-use crate::strategy::FormatParser;
+use crate::format::{Confidence, Format};
+use crate::parser::Parser;
 use docx_rs::*;
+
+const ZIP_MAGIC: [u8; 4] = [0x50, 0x4B, 0x03, 0x04];
+
+/// The part every DOCX carries and no other ZIP does.
+const DOCX_ENTRY: &str = "word/document.xml";
 
 pub struct DocxParser;
 
-impl FormatParser for DocxParser {
-    fn to_markdown(&self, data: &[u8]) -> Result<String, Failure> {
-        let docx = read_docx(data)
+impl Parser for DocxParser {
+    fn format(&self) -> Format {
+        Format::DOCX
+    }
+
+    fn probe(&self, source: &SourceDocument<'_>) -> Confidence {
+        Confidence::certain_if(
+            source.bytes.starts_with(&ZIP_MAGIC) && zip_contains_entry(source.bytes, DOCX_ENTRY),
+        )
+    }
+
+    fn extract(&self, source: &SourceDocument<'_>) -> Result<String, Failure> {
+        let docx = read_docx(source.bytes)
             .map_err(|e| Failure::parse(Format::DOCX, format!("{e}")))?;
 
         let mut md = String::new();
@@ -102,4 +118,15 @@ fn detect_heading_level(para: &Paragraph) -> Option<usize> {
         }
     }
     None
+}
+
+fn zip_contains_entry(data: &[u8], name: &str) -> bool {
+    let cursor = std::io::Cursor::new(data);
+    let Ok(mut archive) = zip::ZipArchive::new(cursor) else {
+        return false;
+    };
+    // Bound rather than returned directly: the ZipFile borrows `archive`, and
+    // a tail expression would outlive it.
+    let found = archive.by_name(name).is_ok();
+    found
 }

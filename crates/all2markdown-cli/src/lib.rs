@@ -2,7 +2,7 @@ use anyhow::{anyhow, Result};
 use clap::Parser;
 use std::path::PathBuf;
 
-use all2markdown_core::{extract, Format, Options, SourceDocument};
+use all2markdown_core::{extract, format_from_id, Options, SourceDocument};
 
 #[derive(Parser)]
 #[command(name = "all2markdown", version, about = "Extract text from documents as Markdown")]
@@ -22,7 +22,7 @@ pub fn run() -> Result<()> {
 
     let options = match cli.format.as_deref() {
         Some(id) => Options::forcing(
-            Format::from_id(id).ok_or_else(|| anyhow!("unsupported format: {id}"))?,
+            format_from_id(id).ok_or_else(|| anyhow!("unsupported format: {id}"))?,
         ),
         None => Options::default(),
     };

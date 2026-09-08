@@ -4,24 +4,30 @@
 //! `docs/adr/0001-text-first-extraction-contract.md` for what "extract" is
 //! promised to mean.
 
-mod detect;
-mod doc;
-mod docx;
 mod extraction;
 mod failure;
 mod format;
 mod metadata;
-mod pdf;
-mod rtf;
-mod strategy;
+mod parser;
+mod parsers;
+mod registry;
 
-pub use detect::detect_format;
 pub use extraction::{Extraction, Options, SourceDocument, Warning};
 pub use failure::Failure;
 pub use format::{Confidence, Format};
 pub use metadata::{DocumentMetadata, FileMetadata};
+pub use parser::Parser;
+pub use registry::Registry;
 
-use strategy::FormatParser;
+use std::sync::OnceLock;
+
+/// The registry the crate-level functions use: the Parsers this crate ships
+/// with, and nothing else. A caller that registers its own Parser builds its
+/// own [`Registry`] and calls it directly.
+fn default_registry() -> &'static Registry {
+    static REGISTRY: OnceLock<Registry> = OnceLock::new();
+    REGISTRY.get_or_init(Registry::with_builtin_parsers)
+}
 
 /// Extract the text of one Source Document.
 ///
@@ -29,34 +35,15 @@ use strategy::FormatParser;
 /// Failure, so that one bad document in a Batch of a million interrupts
 /// nothing.
 pub fn extract(source: SourceDocument<'_>, options: &Options) -> Result<Extraction, Failure> {
-    let format = match options.forced_format {
-        Some(forced) => forced,
-        None => detect_format(&source)?,
-    };
+    default_registry().extract(source, options)
+}
 
-    // Replaced by the Parser registry in milestone 1 step 2, which is what
-    // makes a new format a one-file change.
-    let parser: Box<dyn FormatParser> = match format {
-        Format::DOC => Box::new(doc::DocParser),
-        Format::DOCX => Box::new(docx::DocxParser),
-        Format::RTF => Box::new(rtf::RtfParser),
-        Format::PDF => Box::new(pdf::PdfParser),
-        other => return Err(Failure::UnsupportedFormat(other.id().to_owned())),
-    };
+/// Identify a Source Document by polling the built-in Parsers.
+pub fn detect_format(source: &SourceDocument<'_>) -> Result<Format, Failure> {
+    default_registry().detect(source)
+}
 
-    let markdown = parser.to_markdown(source.bytes)?;
-
-    let mut warnings = Vec::new();
-    if !source.bytes.is_empty() && markdown.trim().is_empty() {
-        warnings.push(Warning::EmptyOutput);
-    }
-
-    Ok(Extraction {
-        markdown,
-        format,
-        encoding: None,
-        file: source.file_metadata(),
-        document: DocumentMetadata::default(),
-        warnings,
-    })
+/// Look a built-in Supported Format up by id, case-insensitively.
+pub fn format_from_id(id: &str) -> Option<Format> {
+    default_registry().format_from_id(id)
 }

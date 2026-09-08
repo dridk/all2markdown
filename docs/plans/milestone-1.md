@@ -56,6 +56,8 @@ divergence is a design bug to fix now.
 
 ### 2. The Parser trait and the registry
 
+_Done._
+
 Three capabilities: recognise itself (`probe` -> `Confidence`), return its
 metadata (default implementation: empty), extract the text. The registry holds
 the Parsers and polls them all, keeping the most confident.

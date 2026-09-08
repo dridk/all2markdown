@@ -14,24 +14,12 @@ impl Format {
     pub const RTF: Format = Format("rtf");
     pub const PDF: Format = Format("pdf");
 
-    /// The formats this crate ships with.
-    pub const BUILTIN: &'static [Format] = &[Self::DOC, Self::DOCX, Self::RTF, Self::PDF];
-
     pub const fn new(id: &'static str) -> Self {
         Format(id)
     }
 
     pub const fn id(self) -> &'static str {
         self.0
-    }
-
-    /// Look an id up among the built-in formats, case-insensitively.
-    ///
-    /// Milestone 1 step 2 moves this onto the registry, which is the only thing
-    /// that can know about formats registered outside this crate.
-    pub fn from_id(id: &str) -> Option<Format> {
-        let id = id.trim().to_ascii_lowercase();
-        Self::BUILTIN.iter().copied().find(|f| f.id() == id)
     }
 }
 
@@ -52,4 +40,18 @@ pub enum Confidence {
     LastResort,
     Likely,
     Certain,
+}
+
+impl Confidence {
+    /// `Certain` when the condition holds, `No` otherwise.
+    ///
+    /// What a Parser whose format opens with a signature answers, which is most
+    /// of them.
+    pub fn certain_if(condition: bool) -> Confidence {
+        if condition {
+            Confidence::Certain
+        } else {
+            Confidence::No
+        }
+    }
 }
