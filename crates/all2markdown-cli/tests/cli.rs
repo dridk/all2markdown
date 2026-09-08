@@ -475,11 +475,11 @@ fn the_stdin_document_can_be_a_jsonl_line_or_an_inventory() {
 
 #[test]
 fn a_document_on_stdin_is_never_guessed_at() {
-    // Without `-`, standard input is not looked at: the default target is the
-    // current directory, and an empty one yields nothing.
+    // Without `-`, standard input is not looked at: flags alone name no
+    // target, and the run is refused rather than guessed at.
     let empty = tempfile::tempdir().unwrap();
     let output = all2markdown_in(empty.path(), &["--jsonl"], &fixture("1000.doc"));
-    assert_eq!(exit_code(&output), 0, "{}", stderr(&output));
+    assert_eq!(exit_code(&output), 2, "{}", stderr(&output));
     assert!(stdout(&output).is_empty(), "{}", stdout(&output));
 
     // The two stdin modes cannot be asked for together.

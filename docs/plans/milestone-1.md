@@ -116,9 +116,9 @@ document mid-batch interrupts no other.
 
 ### 8. CLI
 
-Inputs (current directory, path list on stdin, document on stdin), `-o` with a
-template, `--format`, `--strict`, `--metadata-only`, `--no-front-matter`,
-`--jsonl`, `--ordered`, `-j`, `--max-size`.
+Inputs (a document, a directory, path list on stdin, document on stdin), `-o`
+with a template, `--format`, `--strict`, `--metadata-only`,
+`--no-front-matter`, `--jsonl`, `--ordered`, `-j`, `--max-size`.
 
 ### 9. Python binding
 

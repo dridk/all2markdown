@@ -24,12 +24,12 @@ Exit codes:
     name = "all2markdown",
     version,
     about = "Extract text from documents as Markdown",
-    after_help = EXIT_CODES
+    after_help = EXIT_CODES,
+    arg_required_else_help = true
 )]
 struct Cli {
-    /// A document, a directory whose files are all extracted, or `-` for a
-    /// document read from standard input. Defaults to the current directory,
-    /// without recursion.
+    /// A document, a directory whose files are all extracted without
+    /// recursion, or `-` for a document read from standard input.
     path: Option<PathBuf>,
 
     /// The same target, named. Kept for callers that already write `-i`.
@@ -170,8 +170,16 @@ fn try_run() -> Result<Outcome> {
             Usage::ArgumentConflict,
             "--name names a document read from standard input; pass `-` as the document",
         ),
-        (None, target, None) => {
-            let target = target.unwrap_or_else(|| PathBuf::from("."));
+        // Flags alone name no target. `arg_required_else_help` shows the help
+        // for a bare run; this is the run that carries flags and nothing to
+        // read, which guessing at the current directory would turn into a
+        // dump of it.
+        (None, None, None) => refuse(
+            Usage::MissingRequiredArgument,
+            "no document was named: give a document, a directory, `-` for a document \
+             read from standard input, or --paths-from for a list of paths",
+        ),
+        (None, Some(target), None) => {
             if target.is_dir() {
                 Input::Directory(target)
             } else {
