@@ -23,7 +23,10 @@ fn extract(file_path: &str, format: Option<&str>) -> PyResult<String> {
         None => all2markdown_core::Options::default(),
     };
 
-    let source = match std::path::Path::new(file_path).file_name().and_then(|n| n.to_str()) {
+    let source = match std::path::Path::new(file_path)
+        .file_name()
+        .and_then(|n| n.to_str())
+    {
         Some(name) => all2markdown_core::SourceDocument::named(name, &data),
         None => all2markdown_core::SourceDocument::from_bytes(&data),
     };

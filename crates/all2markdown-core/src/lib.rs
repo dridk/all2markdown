@@ -4,6 +4,7 @@
 //! `docs/adr/0001-text-first-extraction-contract.md` for what "extract" is
 //! promised to mean.
 
+mod encoding;
 mod extraction;
 mod failure;
 mod format;
@@ -12,7 +13,7 @@ mod parser;
 mod parsers;
 mod registry;
 
-pub use extraction::{Extraction, Options, SourceDocument, Warning};
+pub use extraction::{Extracted, Extraction, Options, SourceDocument, Warning};
 pub use failure::Failure;
 pub use format::{Confidence, Format};
 pub use metadata::{DocumentMetadata, FileMetadata};

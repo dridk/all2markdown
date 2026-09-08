@@ -13,6 +13,7 @@ impl Format {
     pub const DOCX: Format = Format("docx");
     pub const RTF: Format = Format("rtf");
     pub const PDF: Format = Format("pdf");
+    pub const TXT: Format = Format("txt");
 
     pub const fn new(id: &'static str) -> Self {
         Format(id)
@@ -50,6 +51,18 @@ impl Confidence {
     pub fn certain_if(condition: bool) -> Confidence {
         if condition {
             Confidence::Certain
+        } else {
+            Confidence::No
+        }
+    }
+
+    /// `Likely` when the condition holds, `No` otherwise.
+    ///
+    /// What a Parser answers about a file name's extension: a name is evidence,
+    /// not proof, so it must lose to any signature that actually matched.
+    pub fn likely_if(condition: bool) -> Confidence {
+        if condition {
+            Confidence::Likely
         } else {
             Confidence::No
         }

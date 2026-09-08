@@ -1,4 +1,4 @@
-use crate::extraction::SourceDocument;
+use crate::extraction::{Extracted, Options, SourceDocument};
 use crate::failure::Failure;
 use crate::format::{Confidence, Format};
 use crate::parser::Parser;
@@ -15,9 +15,14 @@ impl Parser for RtfParser {
 
     fn probe(&self, source: &SourceDocument<'_>) -> Confidence {
         Confidence::certain_if(source.bytes.starts_with(RTF_MAGIC))
+            .max(Confidence::likely_if(source.has_extension("rtf")))
     }
 
-    fn extract(&self, source: &SourceDocument<'_>) -> Result<String, Failure> {
+    fn extract(
+        &self,
+        source: &SourceDocument<'_>,
+        _options: &Options,
+    ) -> Result<Extracted, Failure> {
         let text = std::str::from_utf8(source.bytes)
             .map_err(|e| Failure::parse(Format::RTF, format!("not valid UTF-8: {e}")))?;
         let doc = rtf_parser::RtfDocument::try_from(text)
@@ -62,7 +67,7 @@ impl Parser for RtfParser {
         }
 
         flush_paragraph(&mut md, &mut current_line, current_heading);
-        Ok(md)
+        Ok(md.into())
     }
 }
 

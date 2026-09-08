@@ -1,4 +1,4 @@
-use crate::extraction::SourceDocument;
+use crate::extraction::{Extracted, Options, SourceDocument};
 use crate::failure::Failure;
 use crate::format::{Confidence, Format};
 use crate::parser::Parser;
@@ -20,11 +20,16 @@ impl Parser for DocxParser {
         Confidence::certain_if(
             source.bytes.starts_with(&ZIP_MAGIC) && zip_contains_entry(source.bytes, DOCX_ENTRY),
         )
+        .max(Confidence::likely_if(source.has_extension("docx")))
     }
 
-    fn extract(&self, source: &SourceDocument<'_>) -> Result<String, Failure> {
-        let docx = read_docx(source.bytes)
-            .map_err(|e| Failure::parse(Format::DOCX, format!("{e}")))?;
+    fn extract(
+        &self,
+        source: &SourceDocument<'_>,
+        _options: &Options,
+    ) -> Result<Extracted, Failure> {
+        let docx =
+            read_docx(source.bytes).map_err(|e| Failure::parse(Format::DOCX, format!("{e}")))?;
 
         let mut md = String::new();
 
@@ -52,7 +57,8 @@ impl Parser for DocxParser {
                                     match cell {
                                         TableRowChild::TableCell(tc) => {
                                             for tc_child in &tc.children {
-                                                if let TableCellContent::Paragraph(para) = tc_child {
+                                                if let TableCellContent::Paragraph(para) = tc_child
+                                                {
                                                     let text = extract_paragraph_text(para);
                                                     if !text.trim().is_empty() {
                                                         md.push_str(text.trim());
@@ -72,7 +78,7 @@ impl Parser for DocxParser {
                 _ => {}
             }
         }
-        Ok(md)
+        Ok(md.into())
     }
 }
 

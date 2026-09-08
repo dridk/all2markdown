@@ -7,6 +7,7 @@ mod doc;
 mod docx;
 mod pdf;
 mod rtf;
+mod text;
 
 use crate::registry::Registry;
 
@@ -17,4 +18,5 @@ pub(crate) fn register_builtin(registry: &mut Registry) {
     registry.register(docx::DocxParser);
     registry.register(rtf::RtfParser);
     registry.register(pdf::PdfParser);
+    registry.register(text::TextParser);
 }

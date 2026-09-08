@@ -5,7 +5,11 @@ use std::path::PathBuf;
 use all2markdown_core::{extract, format_from_id, Options, SourceDocument};
 
 #[derive(Parser)]
-#[command(name = "all2markdown", version, about = "Extract text from documents as Markdown")]
+#[command(
+    name = "all2markdown",
+    version,
+    about = "Extract text from documents as Markdown"
+)]
 struct Cli {
     /// Input file path
     #[arg(short = 'i', long = "input")]
@@ -21,9 +25,9 @@ pub fn run() -> Result<()> {
     let data = std::fs::read(&cli.input)?;
 
     let options = match cli.format.as_deref() {
-        Some(id) => Options::forcing(
-            format_from_id(id).ok_or_else(|| anyhow!("unsupported format: {id}"))?,
-        ),
+        Some(id) => {
+            Options::forcing(format_from_id(id).ok_or_else(|| anyhow!("unsupported format: {id}"))?)
+        }
         None => Options::default(),
     };
 

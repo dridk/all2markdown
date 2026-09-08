@@ -51,16 +51,10 @@ fn detect_pdf_format() {
 
 #[test]
 fn detect_too_small() {
-    let source = SourceDocument::from_bytes(b"tiny");
+    // Short *and* undecodable: a short run of text is read as text now, so
+    // FileTooSmall is left explaining only the documents nothing can read.
+    let source = SourceDocument::from_bytes(b"\x00\x01\xfe");
     assert!(matches!(detect_format(&source), Err(Failure::FileTooSmall)));
-}
-
-#[test]
-fn detect_unknown_format() {
-    // Plain text carries no signature. Step 3 makes this the last-resort text
-    // Parser's job; until then it is unrecognized.
-    let source = SourceDocument::from_bytes(b"This is just plain text, not a document format!!");
-    assert!(matches!(detect_format(&source), Err(Failure::UnrecognizedFormat)));
 }
 
 #[test]
@@ -71,7 +65,10 @@ fn a_zip_that_is_no_docx_is_unrecognized() {
     let mut zip = b"PK\x03\x04".to_vec();
     zip.extend_from_slice(b"not really an archive");
     let source = SourceDocument::from_bytes(&zip);
-    assert!(matches!(detect_format(&source), Err(Failure::UnrecognizedFormat)));
+    assert!(matches!(
+        detect_format(&source),
+        Err(Failure::UnrecognizedFormat)
+    ));
 }
 
 #[test]
@@ -133,7 +130,10 @@ fn docx_excludes_textbox_content() {
     let md = markdown_of("1000.docx", Some(Format::DOCX));
     // The PDF rendering shows "ZONE DE TEXTE" in textboxes; the DOCX parser
     // deliberately skips Drawing and Shape runs.
-    assert!(!md.contains("ZONE DE TEXTE"), "DOCX should not contain textbox text, got:\n{md}");
+    assert!(
+        !md.contains("ZONE DE TEXTE"),
+        "DOCX should not contain textbox text, got:\n{md}"
+    );
 }
 
 // ── RTF parser ────────────────────────────────────────────────────
@@ -210,7 +210,10 @@ fn extraction_reports_the_format_it_used() {
 fn extraction_carries_file_metadata() {
     let extraction = extract_fixture("1000.docx", None);
     assert_eq!(extraction.file.name.as_deref(), Some("1000.docx"));
-    assert_eq!(extraction.file.size, Some(fixture("1000.docx").len() as u64));
+    assert_eq!(
+        extraction.file.size,
+        Some(fixture("1000.docx").len() as u64)
+    );
 }
 
 #[test]
@@ -222,8 +225,14 @@ fn a_healthy_document_raises_no_warning() {
 fn forced_format_beats_detection() {
     // A DOCX is a ZIP; forcing RTF must not silently fall back to detection.
     let data = fixture("1000.docx");
-    let result = extract(SourceDocument::from_bytes(&data), &Options::forcing(Format::RTF));
-    assert!(result.is_err(), "forcing a wrong format must fail, not re-detect");
+    let result = extract(
+        SourceDocument::from_bytes(&data),
+        &Options::forcing(Format::RTF),
+    );
+    assert!(
+        result.is_err(),
+        "forcing a wrong format must fail, not re-detect"
+    );
 }
 
 // ── Format ────────────────────────────────────────────────────────
@@ -261,8 +270,14 @@ fn confidence_orders_from_no_to_certain() {
 
 #[test]
 fn extension_is_read_from_the_name() {
-    assert_eq!(SourceDocument::named("report.docx", b"").extension(), Some("docx"));
-    assert_eq!(SourceDocument::named("archive.tar.gz", b"").extension(), Some("gz"));
+    assert_eq!(
+        SourceDocument::named("report.docx", b"").extension(),
+        Some("docx")
+    );
+    assert_eq!(
+        SourceDocument::named("archive.tar.gz", b"").extension(),
+        Some("gz")
+    );
     assert_eq!(SourceDocument::named("README", b"").extension(), None);
     assert_eq!(SourceDocument::named(".gitignore", b"").extension(), None);
     assert_eq!(SourceDocument::from_bytes(b"").extension(), None);

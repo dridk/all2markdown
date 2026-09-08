@@ -20,7 +20,10 @@ impl<'a> SourceDocument<'a> {
     }
 
     pub fn named(name: &'a str, bytes: &'a [u8]) -> Self {
-        Self { bytes, name: Some(name) }
+        Self {
+            bytes,
+            name: Some(name),
+        }
     }
 
     /// The name's extension, without the dot. `None` when there is no name, or
@@ -32,6 +35,16 @@ impl<'a> SourceDocument<'a> {
             return None;
         }
         Some(ext)
+    }
+
+    /// Whether the name's extension is the given one, case-insensitively.
+    ///
+    /// What a Parser answers `Likely` on: the extension stage of the cascade
+    /// lives in the Parsers, so that no shared table has to learn a format's
+    /// extensions when the format is added.
+    pub fn has_extension(&self, expected: &str) -> bool {
+        self.extension()
+            .is_some_and(|ext| ext.eq_ignore_ascii_case(expected))
     }
 
     pub(crate) fn file_metadata(&self) -> FileMetadata {
@@ -52,12 +65,43 @@ impl<'a> SourceDocument<'a> {
 pub enum Warning {
     /// The Source Document carried bytes, but extraction produced no text.
     EmptyOutput,
+    /// The encoding was guessed statistically and the guess is shaky. The text
+    /// is probably right; only the caller can tell, and this is what lets them
+    /// find every questionable document with a query rather than a re-run.
+    UncertainEncoding(String),
 }
 
 impl fmt::Display for Warning {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Warning::EmptyOutput => f.write_str("document is not empty but produced no text"),
+            Warning::UncertainEncoding(encoding) => {
+                write!(f, "encoding guessed as {encoding}, with low confidence")
+            }
+        }
+    }
+}
+
+/// What a Parser produces: the text, plus what only the Parser can know about
+/// how it read it.
+///
+/// A `String` converts into one, so a Parser whose format defines its own
+/// encoding and has nothing to warn about still returns a single expression.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct Extracted {
+    pub markdown: String,
+    /// The encoding the text was decoded from, for formats where that is a
+    /// meaningful question. `None` for formats that define their own.
+    pub encoding: Option<String>,
+    pub warnings: Vec<Warning>,
+}
+
+impl From<String> for Extracted {
+    fn from(markdown: String) -> Self {
+        Self {
+            markdown,
+            encoding: None,
+            warnings: Vec::new(),
         }
     }
 }
@@ -86,10 +130,30 @@ pub struct Options {
     /// Bypasses detection. Always wins: the caller knows things the bytes do
     /// not say.
     pub forced_format: Option<Format>,
+    /// Bypasses encoding detection, by label — `"windows-1252"`, `"utf-8"`.
+    /// For the caller who knows better than the heuristic.
+    pub forced_encoding: Option<String>,
+    /// Removes the last-resort stage of the cascade, and nothing else: an
+    /// unidentified but decodable document becomes a Failure. For the caller
+    /// who wants an exact inventory rather than a permissive read.
+    pub strict: bool,
 }
 
 impl Options {
     pub fn forcing(format: Format) -> Self {
-        Self { forced_format: Some(format) }
+        Self {
+            forced_format: Some(format),
+            ..Self::default()
+        }
+    }
+
+    pub fn with_encoding(mut self, label: impl Into<String>) -> Self {
+        self.forced_encoding = Some(label.into());
+        self
+    }
+
+    pub fn strict(mut self) -> Self {
+        self.strict = true;
+        self
     }
 }

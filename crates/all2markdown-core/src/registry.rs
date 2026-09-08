@@ -28,7 +28,9 @@ impl Default for Registry {
 impl Registry {
     /// An empty registry, which recognises nothing.
     pub fn new() -> Self {
-        Self { parsers: Vec::new() }
+        Self {
+            parsers: Vec::new(),
+        }
     }
 
     /// A registry holding the Parsers this crate ships with.
@@ -58,16 +60,37 @@ impl Registry {
     /// Look a Supported Format up by id, case-insensitively.
     pub fn format_from_id(&self, id: &str) -> Option<Format> {
         let id = id.trim().to_ascii_lowercase();
-        self.parsers().map(|parser| parser.format()).find(|format| format.id() == id)
+        self.parsers()
+            .map(|parser| parser.format())
+            .find(|format| format.id() == id)
     }
 
     /// Identify a Source Document by polling every Parser and keeping the most
     /// confident, ties broken by registration order.
     pub fn detect(&self, source: &SourceDocument<'_>) -> Result<Format, Failure> {
+        self.detect_with(source, &Options::default())
+    }
+
+    /// Identify a Source Document, honouring the strict flag.
+    ///
+    /// Strict mode is the whole of its own implementation: it drops the
+    /// `LastResort` stage and touches nothing else, so an unidentified but
+    /// decodable document becomes a Failure while every other answer stands.
+    pub fn detect_with(
+        &self,
+        source: &SourceDocument<'_>,
+        options: &Options,
+    ) -> Result<Format, Failure> {
+        let floor = if options.strict {
+            Confidence::LastResort
+        } else {
+            Confidence::No
+        };
+
         let mut best: Option<(Confidence, Format)> = None;
         for parser in self.parsers() {
             let confidence = parser.probe(source);
-            if confidence == Confidence::No {
+            if confidence <= floor {
                 continue;
             }
             if best.is_none_or(|(seen, _)| confidence > seen) {
@@ -92,25 +115,25 @@ impl Registry {
     ) -> Result<Extraction, Failure> {
         let format = match options.forced_format {
             Some(forced) => forced,
-            None => self.detect(&source)?,
+            None => self.detect_with(&source, options)?,
         };
 
         let parser = self
             .parser_for(format)
             .ok_or_else(|| Failure::UnsupportedFormat(format.id().to_owned()))?;
 
-        let markdown = parser.extract(&source)?;
+        let extracted = parser.extract(&source, options)?;
         let document = parser.metadata(&source)?;
 
-        let mut warnings = Vec::new();
-        if !source.bytes.is_empty() && markdown.trim().is_empty() {
+        let mut warnings = extracted.warnings;
+        if !source.bytes.is_empty() && extracted.markdown.trim().is_empty() {
             warnings.push(Warning::EmptyOutput);
         }
 
         Ok(Extraction {
-            markdown,
+            markdown: extracted.markdown,
             format,
-            encoding: None,
+            encoding: extracted.encoding,
             file: source.file_metadata(),
             document,
             warnings,

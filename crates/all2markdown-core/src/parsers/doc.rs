@@ -1,4 +1,4 @@
-use crate::extraction::SourceDocument;
+use crate::extraction::{Extracted, Options, SourceDocument};
 use crate::failure::Failure;
 use crate::format::{Confidence, Format};
 use crate::parser::Parser;
@@ -15,11 +15,16 @@ impl Parser for DocParser {
 
     fn probe(&self, source: &SourceDocument<'_>) -> Confidence {
         Confidence::certain_if(source.bytes.starts_with(&OLE2_MAGIC))
+            .max(Confidence::likely_if(source.has_extension("doc")))
     }
 
-    fn extract(&self, source: &SourceDocument<'_>) -> Result<String, Failure> {
+    fn extract(
+        &self,
+        source: &SourceDocument<'_>,
+        _options: &Options,
+    ) -> Result<Extracted, Failure> {
         let doc = unword::parse_doc(source.bytes)
             .map_err(|e| Failure::parse(Format::DOC, format!("{e}")))?;
-        Ok(doc.body_text)
+        Ok(doc.body_text.into())
     }
 }

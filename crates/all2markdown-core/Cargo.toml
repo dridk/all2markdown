@@ -11,3 +11,8 @@ rtf-parser = "0.4"
 pdf-extract = "0.7"
 zip = "2"
 thiserror = "2"
+encoding_rs = "0.8.40"
+chardetng = "0.1"
+
+[dev-dependencies]
+encoding_rs = "0.8.40"

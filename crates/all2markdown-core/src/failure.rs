@@ -16,6 +16,9 @@ pub enum Failure {
     #[error("file too small to identify")]
     FileTooSmall,
 
+    #[error("unknown encoding: {0}")]
+    UnknownEncoding(String),
+
     #[error("{format} parser failed: {message}")]
     Parse { format: Format, message: String },
 
@@ -25,6 +28,9 @@ pub enum Failure {
 
 impl Failure {
     pub fn parse(format: Format, message: impl Into<String>) -> Self {
-        Failure::Parse { format, message: message.into() }
+        Failure::Parse {
+            format,
+            message: message.into(),
+        }
     }
 }
