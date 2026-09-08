@@ -121,11 +121,33 @@ fn a_registered_format_can_be_looked_up_by_id() {
 
 #[test]
 fn a_parser_that_declares_nothing_reports_no_document_metadata() {
-    let registry = Registry::with_builtin_parsers();
-    let data = fixture("1000.docx");
+    // The trait's default, and the reason a format that carries no metadata
+    // stays down to two methods: this Parser implements no `metadata`.
+    struct Terse;
+    impl Parser for Terse {
+        fn format(&self) -> Format {
+            Format::new("terse")
+        }
+        fn probe(&self, _source: &SourceDocument<'_>) -> Confidence {
+            Confidence::Certain
+        }
+        fn extract(
+            &self,
+            _source: &SourceDocument<'_>,
+            _options: &Options,
+        ) -> Result<Extracted, Failure> {
+            Ok("a word".to_owned().into())
+        }
+    }
+
+    let mut registry = Registry::new();
+    registry.register(Terse);
 
     let extraction = registry
-        .extract(SourceDocument::from_bytes(&data), &Options::default())
+        .extract(
+            SourceDocument::from_bytes(b"anything at all"),
+            &Options::default(),
+        )
         .unwrap();
 
     assert!(extraction.document.is_empty());

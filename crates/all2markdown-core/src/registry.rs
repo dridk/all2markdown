@@ -181,5 +181,6 @@ fn unwrapped<'a>(source: &SourceDocument<'a>, content: &'a [u8]) -> SourceDocume
     SourceDocument {
         bytes: content,
         name: source.name.map(envelope::strip_extension),
+        modified: source.modified,
     }
 }

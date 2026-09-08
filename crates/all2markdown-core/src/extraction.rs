@@ -12,18 +12,33 @@ pub struct SourceDocument<'a> {
     /// The file name, when the caller knows it. Detection uses its extension
     /// for the formats that carry no signature of their own.
     pub name: Option<&'a str>,
+    /// When the filesystem says the file last changed, as a Unix timestamp.
+    /// Known only to a caller that read it off a disk; bytes handed over by an
+    /// object store carry no such thing.
+    pub modified: Option<i64>,
 }
 
 impl<'a> SourceDocument<'a> {
     pub fn from_bytes(bytes: &'a [u8]) -> Self {
-        Self { bytes, name: None }
+        Self {
+            bytes,
+            name: None,
+            modified: None,
+        }
     }
 
     pub fn named(name: &'a str, bytes: &'a [u8]) -> Self {
         Self {
             bytes,
             name: Some(name),
+            modified: None,
         }
+    }
+
+    /// Record when the filesystem says the file last changed.
+    pub fn modified_at(mut self, timestamp: i64) -> Self {
+        self.modified = Some(timestamp);
+        self
     }
 
     /// The name's extension, without the dot. `None` when there is no name, or
@@ -51,7 +66,7 @@ impl<'a> SourceDocument<'a> {
         FileMetadata {
             name: self.name.map(str::to_owned),
             size: Some(self.bytes.len() as u64),
-            modified: None,
+            modified: self.modified,
         }
     }
 }

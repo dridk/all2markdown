@@ -4,6 +4,7 @@
 //! `docs/adr/0001-text-first-extraction-contract.md` for what "extract" is
 //! promised to mean.
 
+mod date;
 mod encoding;
 mod envelope;
 mod extraction;
