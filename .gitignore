@@ -1,8 +1,8 @@
 /target
-*.swp
-*.swo
-__pycache__/
-*.pyc
-*.egg-info/
-dist/
-.venv/
+**/*.rs.bk
+
+# LibreOffice / OpenOffice lock files left behind when a fixture is open
+.~lock.*#
+
+# Benchmark corpus lives outside the repo; see docs/plans/milestone-1.md
+/corpora

@@ -1,4 +1,4 @@
-use crate::error::All2mdError;
+use crate::error::Error;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Format {
@@ -9,13 +9,13 @@ pub enum Format {
 }
 
 impl Format {
-    pub fn from_str_loose(s: &str) -> Result<Self, All2mdError> {
+    pub fn from_str_loose(s: &str) -> Result<Self, Error> {
         match s.to_lowercase().as_str() {
             "doc" => Ok(Format::Doc),
             "docx" => Ok(Format::Docx),
             "rtf" => Ok(Format::Rtf),
             "pdf" => Ok(Format::Pdf),
-            _ => Err(All2mdError::UnsupportedFormat(s.to_string())),
+            _ => Err(Error::UnsupportedFormat(s.to_string())),
         }
     }
 }
@@ -25,9 +25,9 @@ const ZIP_MAGIC: [u8; 4] = [0x50, 0x4B, 0x03, 0x04];
 const RTF_MAGIC: &[u8] = b"{\\rtf";
 const PDF_MAGIC: &[u8] = b"%PDF";
 
-pub fn detect_format(data: &[u8]) -> Result<Format, All2mdError> {
+pub fn detect_format(data: &[u8]) -> Result<Format, Error> {
     if data.len() < 8 {
-        return Err(All2mdError::FileTooSmall);
+        return Err(Error::FileTooSmall);
     }
 
     if data.starts_with(RTF_MAGIC) {
@@ -42,14 +42,14 @@ pub fn detect_format(data: &[u8]) -> Result<Format, All2mdError> {
         if zip_contains_entry(data, "word/document.xml") {
             return Ok(Format::Docx);
         }
-        return Err(All2mdError::UnsupportedFormat("ZIP (not DOCX)".into()));
+        return Err(Error::UnsupportedFormat("ZIP (not DOCX)".into()));
     }
 
     if data[..8] == OLE2_MAGIC {
         return Ok(Format::Doc);
     }
 
-    Err(All2mdError::UnrecognizedFormat)
+    Err(Error::UnrecognizedFormat)
 }
 
 fn zip_contains_entry(data: &[u8], name: &str) -> bool {

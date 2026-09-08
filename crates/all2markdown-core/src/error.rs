@@ -1,7 +1,7 @@
 use thiserror::Error;
 
 #[derive(Error, Debug)]
-pub enum All2mdError {
+pub enum Error {
     #[error("Parse error: {0}")]
     ParseError(String),
 

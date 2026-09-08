@@ -1,15 +1,15 @@
-use crate::error::All2mdError;
+use crate::error::Error;
 use crate::strategy::FormatParser;
 use rtf_parser::Painter;
 
 pub struct RtfParser;
 
 impl FormatParser for RtfParser {
-    fn to_markdown(&self, data: &[u8]) -> Result<String, All2mdError> {
+    fn to_markdown(&self, data: &[u8]) -> Result<String, Error> {
         let text = std::str::from_utf8(data)
-            .map_err(|e| All2mdError::ParseError(format!("RTF not valid UTF-8: {e}")))?;
+            .map_err(|e| Error::ParseError(format!("RTF not valid UTF-8: {e}")))?;
         let doc = rtf_parser::RtfDocument::try_from(text)
-            .map_err(|e| All2mdError::ParseError(format!("RTF: {e}")))?;
+            .map_err(|e| Error::ParseError(format!("RTF: {e}")))?;
 
         // rtf-parser splits text into StyleBlocks by painter changes.
         // Paragraph breaks (\par) are lost when the style doesn't change.

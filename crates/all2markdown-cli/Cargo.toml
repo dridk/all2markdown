@@ -1,14 +1,10 @@
 [package]
-name = "all2md-cli"
+name = "all2markdown-cli"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
 
-[[bin]]
-name = "all2md"
-path = "src/main.rs"
-
 [dependencies]
-all2md-core = { path = "../all2md-core" }
+all2markdown-core = { path = "../all2markdown-core" }
 clap = { version = "4", features = ["derive"] }
 anyhow = "1"

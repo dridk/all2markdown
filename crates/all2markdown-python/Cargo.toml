@@ -1,13 +1,13 @@
 [package]
-name = "all2md-python"
+name = "all2markdown-python"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
 
 [lib]
-name = "all2md"
+name = "all2markdown"
 crate-type = ["cdylib"]
 
 [dependencies]
-all2md-core = { path = "../all2md-core" }
+all2markdown-core = { path = "../all2markdown-core" }
 pyo3 = { version = "0.23", features = ["extension-module"] }

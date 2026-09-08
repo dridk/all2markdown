@@ -1,13 +1,13 @@
-use crate::error::All2mdError;
+use crate::error::Error;
 use crate::strategy::FormatParser;
 use docx_rs::*;
 
 pub struct DocxParser;
 
 impl FormatParser for DocxParser {
-    fn to_markdown(&self, data: &[u8]) -> Result<String, All2mdError> {
+    fn to_markdown(&self, data: &[u8]) -> Result<String, Error> {
         let docx = read_docx(data)
-            .map_err(|e| All2mdError::ParseError(format!("DOCX: {e}")))?;
+            .map_err(|e| Error::ParseError(format!("DOCX: {e}")))?;
 
         let mut md = String::new();
 

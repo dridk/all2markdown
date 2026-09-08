@@ -1,5 +1,5 @@
 [package]
-name = "all2md-core"
+name = "all2markdown-core"
 version.workspace = true
 edition.workspace = true
 license.workspace = true

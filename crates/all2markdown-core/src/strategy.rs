@@ -1,5 +1,5 @@
-use crate::error::All2mdError;
+use crate::error::Error;
 
 pub trait FormatParser {
-    fn to_markdown(&self, data: &[u8]) -> Result<String, All2mdError>;
+    fn to_markdown(&self, data: &[u8]) -> Result<String, Error>;
 }

@@ -3,8 +3,8 @@ requires = ["maturin>=1.0,<2.0"]
 build-backend = "maturin"
 
 [project]
-name = "all2md"
-requires-python = ">=3.9"
+name = "all2markdown"
+requires-python = ">=3.10"
 
 [tool.maturin]
 manifest-path = "Cargo.toml"

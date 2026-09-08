@@ -29,16 +29,16 @@ dependencies = [
 ]
 
 [[package]]
-name = "all2md-cli"
+name = "all2markdown-cli"
 version = "0.1.0"
 dependencies = [
- "all2md-core",
+ "all2markdown-core",
  "anyhow",
  "clap",
 ]
 
 [[package]]
-name = "all2md-core"
+name = "all2markdown-core"
 version = "0.1.0"
 dependencies = [
  "docx-rs",
@@ -50,10 +50,10 @@ dependencies = [
 ]
 
 [[package]]
-name = "all2md-python"
+name = "all2markdown-python"
 version = "0.1.0"
 dependencies = [
- "all2md-core",
+ "all2markdown-core",
  "pyo3",
 ]
 

@@ -1,4 +1,4 @@
-use all2md_core::{parse, detect_format, Format, All2mdError};
+use all2markdown_core::{parse, detect_format, Format, Error};
 use std::path::Path;
 
 fn fixture(name: &str) -> Vec<u8> {
@@ -37,13 +37,13 @@ fn detect_pdf_format() {
 #[test]
 fn detect_too_small() {
     let data = b"tiny";
-    assert!(matches!(detect_format(data), Err(All2mdError::FileTooSmall)));
+    assert!(matches!(detect_format(data), Err(Error::FileTooSmall)));
 }
 
 #[test]
 fn detect_unknown_format() {
     let data = b"This is just plain text, not a document format!!";
-    assert!(matches!(detect_format(data), Err(All2mdError::UnrecognizedFormat)));
+    assert!(matches!(detect_format(data), Err(Error::UnrecognizedFormat)));
 }
 
 // ── DOC parser ────────────────────────────────────────────────────

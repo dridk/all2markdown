@@ -1,5 +1,5 @@
 [workspace]
-members = ["crates/all2md-core", "crates/all2md-cli", "crates/all2md-python"]
+members = ["crates/all2markdown-core", "crates/all2markdown-cli", "crates/all2markdown-python"]
 resolver = "2"
 
 [workspace.package]

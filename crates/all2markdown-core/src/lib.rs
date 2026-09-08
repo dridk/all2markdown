@@ -7,10 +7,10 @@ mod rtf;
 mod strategy;
 
 pub use detect::{detect_format, Format};
-pub use error::All2mdError;
+pub use error::Error;
 use strategy::FormatParser;
 
-pub fn parse(data: &[u8], format: Option<Format>) -> Result<String, All2mdError> {
+pub fn parse(data: &[u8], format: Option<Format>) -> Result<String, Error> {
     let format = match format {
         Some(f) => f,
         None => detect_format(data)?,

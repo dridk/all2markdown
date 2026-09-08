@@ -2,10 +2,10 @@ use anyhow::Result;
 use clap::Parser;
 use std::path::PathBuf;
 
-use all2md_core::{parse, Format};
+use all2markdown_core::{parse, Format};
 
 #[derive(Parser)]
-#[command(name = "all2md", version, about = "Convert documents to Markdown")]
+#[command(name = "all2markdown", version, about = "Extract text from documents as Markdown")]
 struct Cli {
     /// Input file path
     #[arg(short = 'i', long = "input")]
@@ -16,7 +16,7 @@ struct Cli {
     format: Option<String>,
 }
 
-fn main() -> Result<()> {
+pub fn run() -> Result<()> {
     let cli = Cli::parse();
     let data = std::fs::read(&cli.input)?;
     let format = cli
