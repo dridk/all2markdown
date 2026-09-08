@@ -70,6 +70,8 @@ answers "last resort".
 
 ### 3. Detection and encoding
 
+_Done._
+
 Assembling the cascade and the encoding detection, plus the last-resort `txt`
 Parser and its decodability test (encoding identified, no null bytes, low
 control-character ratio). The `--strict` flag.
@@ -79,6 +81,8 @@ control-character ratio). The `--strict` flag.
 
 ### 4. Envelopes
 
+_Done._
+
 Stripping gzip/zstd/xz/bzip2 before detection, depth 1, size cap applied to the
 decompressed size during decompression.
 
@@ -86,6 +90,8 @@ decompressed size during decompression.
 decompression bomb yields a Failure, not an OOM.
 
 ### 5. Porting the four existing parsers
+
+_Done._
 
 doc, docx, rtf and pdf moved onto the new trait, with metadata extraction and
 warning emission (notably: PDF with no text layer).

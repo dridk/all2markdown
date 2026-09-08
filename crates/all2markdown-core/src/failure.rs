@@ -31,6 +31,11 @@ pub enum Failure {
     #[error("a compressed document may not contain another")]
     NestedEnvelope,
 
+    /// A Parser panicked on malformed input, which it must never do. Caught
+    /// and reported so that the bug costs one document rather than a Batch.
+    #[error("parser panicked: {0}")]
+    Panic(String),
+
     #[error("{format} parser failed: {message}")]
     Parse { format: Format, message: String },
 

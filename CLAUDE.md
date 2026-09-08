@@ -32,6 +32,7 @@ cd crates/all2markdown-python && maturin develop && python -m pytest python/test
 ```bash
 all2markdown -i file.docx > out.md            # auto-detect format
 all2markdown -i file.doc -f doc > out.md      # explicit format
+all2markdown ./corpus -j 8 > out.jsonl        # a directory, in parallel, as JSONL
 ```
 
 ## Architecture
@@ -46,10 +47,21 @@ Current state, being reshaped by milestone 1:
 - Adding a format means one new file in `parsers/` plus its `mod` and
   `register` lines in `parsers/mod.rs`; nothing else changes. A Parser written
   outside this crate costs one `Registry::register` call and no edit here.
+- Detection is the Confidence ordering and nothing else: a Parser answers
+  `Certain` on a signature, `Likely` on an extension, `LastResort` on mere
+  decodability. The `txt` Parser is that last rung, registered like any other,
+  which is why `--strict` is one line — it drops `LastResort`.
+- `envelope.rs` strips gzip/zstd/xz/bzip2 before detection, one deep, capped on
+  the *decompressed* size as it inflates
+- `batch.rs` is the parallel path: rayon over a bounded queue, results in
+  completion order, each document's panic caught so it costs one document
 - DOCX parser skips `RunChild::Drawing` and `RunChild::Shape` to exclude
   textbox text
 - DOC uses `unword`, DOCX uses `docx-rs`, RTF uses `rtf-parser`, PDF uses
   `pdf-extract`
+- Document Metadata comes only from what those libraries expose: DOCX through
+  its `docProps` parts, PDF through the Info dictionary. `unword` and
+  `rtf-parser` expose none, so doc and rtf declare none.
 
 ## Key Conventions
 
