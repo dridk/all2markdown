@@ -1,8 +1,8 @@
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use clap::Parser;
 use std::path::PathBuf;
 
-use all2markdown_core::{parse, Format};
+use all2markdown_core::{extract, Format, Options, SourceDocument};
 
 #[derive(Parser)]
 #[command(name = "all2markdown", version, about = "Extract text from documents as Markdown")]
@@ -11,7 +11,7 @@ struct Cli {
     #[arg(short = 'i', long = "input")]
     input: PathBuf,
 
-    /// Format: doc, docx, rtf, pdf (auto-detected if omitted)
+    /// Format: doc, docx, rtf, pdf (detected from the content if omitted)
     #[arg(short = 'f', long = "format")]
     format: Option<String>,
 }
@@ -19,11 +19,26 @@ struct Cli {
 pub fn run() -> Result<()> {
     let cli = Cli::parse();
     let data = std::fs::read(&cli.input)?;
-    let format = cli
-        .format
-        .map(|f| Format::from_str_loose(&f))
-        .transpose()?;
-    let markdown = parse(&data, format)?;
-    print!("{}", markdown);
+
+    let options = match cli.format.as_deref() {
+        Some(id) => Options::forcing(
+            Format::from_id(id).ok_or_else(|| anyhow!("unsupported format: {id}"))?,
+        ),
+        None => Options::default(),
+    };
+
+    let source = match cli.input.file_name().and_then(|n| n.to_str()) {
+        Some(name) => SourceDocument::named(name, &data),
+        None => SourceDocument::from_bytes(&data),
+    };
+
+    let extraction = extract(source, &options)?;
+
+    // Warnings go to stderr so that piping the Markdown stays clean.
+    for warning in &extraction.warnings {
+        eprintln!("warning: {warning}");
+    }
+
+    print!("{}", extraction.markdown);
     Ok(())
 }

@@ -5,24 +5,36 @@ use pyo3::prelude::*;
 ///
 /// Args:
 ///     file_path: Path to the document file
-///     format: Optional format string ("doc", "docx", "rtf", "pdf")
+///     format: Optional format id ("doc", "docx", "rtf", "pdf")
 ///
 /// Returns:
 ///     Markdown string
 #[pyfunction]
 #[pyo3(signature = (file_path, format=None))]
-fn parse(file_path: &str, format: Option<&str>) -> PyResult<String> {
+fn extract(file_path: &str, format: Option<&str>) -> PyResult<String> {
     let data = std::fs::read(file_path)
         .map_err(|e| PyValueError::new_err(format!("Cannot read file: {e}")))?;
-    let fmt = format
-        .map(|f| all2markdown_core::Format::from_str_loose(f))
-        .transpose()
-        .map_err(|e| PyValueError::new_err(e.to_string()))?;
-    all2markdown_core::parse(&data, fmt).map_err(|e| PyValueError::new_err(e.to_string()))
+
+    let options = match format {
+        Some(id) => all2markdown_core::Options::forcing(
+            all2markdown_core::Format::from_id(id)
+                .ok_or_else(|| PyValueError::new_err(format!("unsupported format: {id}")))?,
+        ),
+        None => all2markdown_core::Options::default(),
+    };
+
+    let source = match std::path::Path::new(file_path).file_name().and_then(|n| n.to_str()) {
+        Some(name) => all2markdown_core::SourceDocument::named(name, &data),
+        None => all2markdown_core::SourceDocument::from_bytes(&data),
+    };
+
+    all2markdown_core::extract(source, &options)
+        .map(|extraction| extraction.markdown)
+        .map_err(|e| PyValueError::new_err(e.to_string()))
 }
 
 #[pymodule]
 fn all2markdown(m: &Bound<'_, PyModule>) -> PyResult<()> {
-    m.add_function(wrap_pyfunction!(parse, m)?)?;
+    m.add_function(wrap_pyfunction!(extract, m)?)?;
     Ok(())
 }

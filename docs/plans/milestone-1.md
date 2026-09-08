@@ -35,6 +35,8 @@ before the trait is stable would mean rewriting all of them.
 
 ### 0. Rename and hygiene
 
+_Done._
+
 Repo, crate directories, `all2markdown-core` / `-cli` / `-python`, binary
 `all2markdown` plus the `a2md` alias, Python module `all2markdown`. Add a
 `.gitignore` (`target/`, `.~lock.*#`, the benchmark corpus).
@@ -42,6 +44,8 @@ Repo, crate directories, `all2markdown-core` / `-cli` / `-python`, binary
 *Check*: `cargo build` passes, no occurrence of `all2md` outside the ADRs.
 
 ### 1. The model
+
+_Done._
 
 The glossary types: `SourceDocument`, `Extraction`, `Warning`, `Failure`,
 `FileMetadata`, `DocumentMetadata`, `Confidence`, `Format`. No logic, only data.
@@ -108,7 +112,7 @@ template, `--format`, `--strict`, `--metadata-only`, `--no-front-matter`,
 
 ### 9. Python binding
 
-`convert`, `convert_bytes`, `convert_many` (accepts any iterable, returns an
+`extract`, `extract_bytes`, `extract_many` (accepts any iterable, returns an
 iterator, releases the GIL), `workers=`. `.pyi` stubs shipped.
 
 *Check*: `examples/s3_batch.py` runs unmodified against a local MinIO.
@@ -124,6 +128,20 @@ static binaries in releases.
 yields both the library **and** the command.
 
 ### 11. Tests
+
+Three test seams, and no more. A seam is a door a test knocks on; each one is a
+contract frozen in place, so the fewest and highest possible win.
+
+| Seam | The door | What only it can catch |
+|---|---|---|
+| Core | `all2markdown_core::extract` | Detection, encoding, envelopes, parsers, rendering, batching |
+| CLI | `all2markdown_cli::run` | Flags, the `-o` template, stdin, exit codes |
+| Python | `import all2markdown` | The iterator stays lazy, the GIL is released |
+
+The Python seam stays deliberately small, around five tests. It exists because
+an `extract_many` that quietly materialises its results would break the
+million-document target, and no Rust test can observe that from the other side
+of the binding.
 
 - Reference corpus (`tests/fixtures/reference/`): one file per format, produced
   by hand from `reference.txt` with the styles applied. Assertions on the

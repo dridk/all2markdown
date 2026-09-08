@@ -1,55 +1,44 @@
-use crate::error::Error;
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Format {
-    Doc,
-    Docx,
-    Rtf,
-    Pdf,
-}
-
-impl Format {
-    pub fn from_str_loose(s: &str) -> Result<Self, Error> {
-        match s.to_lowercase().as_str() {
-            "doc" => Ok(Format::Doc),
-            "docx" => Ok(Format::Docx),
-            "rtf" => Ok(Format::Rtf),
-            "pdf" => Ok(Format::Pdf),
-            _ => Err(Error::UnsupportedFormat(s.to_string())),
-        }
-    }
-}
+use crate::extraction::SourceDocument;
+use crate::failure::Failure;
+use crate::format::Format;
 
 const OLE2_MAGIC: [u8; 8] = [0xD0, 0xCF, 0x11, 0xE0, 0xA1, 0xB1, 0x1A, 0xE1];
 const ZIP_MAGIC: [u8; 4] = [0x50, 0x4B, 0x03, 0x04];
 const RTF_MAGIC: &[u8] = b"{\\rtf";
 const PDF_MAGIC: &[u8] = b"%PDF";
 
-pub fn detect_format(data: &[u8]) -> Result<Format, Error> {
+/// Identify a Source Document from its content.
+///
+/// Milestone 1 step 2 replaces this with a poll of the Parser registry, so that
+/// a new format stops needing an edit here. Step 3 adds the extension and
+/// plain-text stages of the cascade.
+pub fn detect_format(source: &SourceDocument<'_>) -> Result<Format, Failure> {
+    let data = source.bytes;
+
     if data.len() < 8 {
-        return Err(Error::FileTooSmall);
+        return Err(Failure::FileTooSmall);
     }
 
     if data.starts_with(RTF_MAGIC) {
-        return Ok(Format::Rtf);
+        return Ok(Format::RTF);
     }
 
     if data.starts_with(PDF_MAGIC) {
-        return Ok(Format::Pdf);
+        return Ok(Format::PDF);
     }
 
     if data.starts_with(&ZIP_MAGIC) {
         if zip_contains_entry(data, "word/document.xml") {
-            return Ok(Format::Docx);
+            return Ok(Format::DOCX);
         }
-        return Err(Error::UnsupportedFormat("ZIP (not DOCX)".into()));
+        return Err(Failure::UnsupportedFormat("ZIP (not DOCX)".into()));
     }
 
     if data[..8] == OLE2_MAGIC {
-        return Ok(Format::Doc);
+        return Ok(Format::DOC);
     }
 
-    Err(Error::UnrecognizedFormat)
+    Err(Failure::UnrecognizedFormat)
 }
 
 fn zip_contains_entry(data: &[u8], name: &str) -> bool {
@@ -57,6 +46,8 @@ fn zip_contains_entry(data: &[u8], name: &str) -> bool {
     let Ok(mut archive) = zip::ZipArchive::new(cursor) else {
         return false;
     };
-    let result = archive.by_name(name).is_ok();
-    result
+    // Bound rather than returned directly: the ZipFile borrows `archive`,
+    // and as a tail expression it would outlive it.
+    let found = archive.by_name(name).is_ok();
+    found
 }

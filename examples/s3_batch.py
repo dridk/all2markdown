@@ -67,15 +67,15 @@ def source(keys):
 
 
 def main() -> None:
-    converted = suspect = failed = 0
+    extracted = suspect = failed = 0
 
     with open("output.jsonl", "w", encoding="utf-8") as out:
-        extractions = all2markdown.convert_many(
+        extractions = all2markdown.extract_many(
             source(list_keys(BUCKET, PREFIX)),
             workers=EXTRACTORS,
         )
 
-        # convert_many returns an iterator: results arrive as they are produced,
+        # extract_many returns an iterator: results arrive as they are produced,
         # memory stays bounded, and Ctrl-C interrupts cleanly.
         for extraction in extractions:
             if extraction.error is not None:
@@ -87,7 +87,7 @@ def main() -> None:
                 suspect += 1
                 print(f"SUSPECT {extraction.name}: {', '.join(extraction.warnings)}")
 
-            converted += 1
+            extracted += 1
             out.write(
                 json.dumps(
                     {
@@ -103,7 +103,7 @@ def main() -> None:
                 + "\n"
             )
 
-    print(f"\n{converted} converted, {suspect} suspect, {failed} failed")
+    print(f"\n{extracted} extracted, {suspect} suspect, {failed} failed")
 
 
 if __name__ == "__main__":
