@@ -1,0 +1,134 @@
+SENTINELLE-DEBUT-9F3A1C
+
+[HEADING 1] Rapport de reference all2md
+
+[PARAGRAPH] Ce document est la source unique de verite des tests all2md. Il est
+enregistre a l'identique dans chaque format supporte. Tout texte present ici doit
+se retrouver dans le Markdown extrait, quel que soit le format d'origine.
+
+
+[HEADING 2] 1. Caracteres accentues et Unicode
+
+[PARAGRAPH] Accents francais : a la creche, ou l'eleve etudia l'ile, il crut
+naitre. Serie complete : a a a e e e e i i o o u u u y c ae oe.
+Majuscules accentuees : A E E U C OE AE.
+Symboles : euro 20 EUR, livre 15 GBP, copyright, marque deposee, degre 37,5 C,
+plus ou moins, multiplie, divise, guillemets francais, tiret cadratin, points de
+suspension.
+Alphabets non latins : Ellinika, Russkiy, chinois, arabe, japonais.
+Ligne temoin unicode brute : à â ä é è ê ë î ï ô ö ù û ü ÿ ç œ € £ © ® ™ ° ± × ÷ « » — – … Ελληνικά Русский 中文测试 العربية にほんご
+
+[PARAGRAPH] Cette ligne temoin est deliberement en UTF-8. Si elle ressort
+mutilee, la detection d'encodage a echoue.
+
+
+[HEADING 2] 2. Caracteres significatifs en Markdown
+
+[PARAGRAPH] Les caracteres suivants ont un sens en Markdown et ne doivent pas
+corrompre la sortie : asterisque * etoile double ** underscore _ double __
+diese # au milieu, accent grave ` et triple ``` , barre verticale | crochets [ ]
+parentheses ( ) chevrons < > antislash \ esperluette & tilde ~ signe plus +
+moins - en debut de ligne.
+
+[PARAGRAPH] Piege classique : une ligne qui commence par un tiret sans etre une
+liste.
+- ceci n'est pas une puce, c'est du texte qui commence par un tiret
+1. ceci n'est pas une liste numerotee non plus
+# ceci n'est pas un titre
+
+[PARAGRAPH] Balise HTML litterale dans du texte : <div class="test"> et
+&amp; et &lt;script&gt;.
+
+
+[HEADING 2] 3. Structure de titres
+
+[HEADING 3] 3.1 Sous-section de niveau trois
+
+[PARAGRAPH] Contenu de la sous-section de niveau trois.
+
+[HEADING 4] 3.1.1 Sous-section de niveau quatre
+
+[PARAGRAPH] Contenu de la sous-section de niveau quatre. La profondeur des
+titres doit etre preservee lorsqu'elle est detectable.
+
+
+[HEADING 2] 4. Listes
+
+[PARAGRAPH] Liste a puces, avec un niveau d'imbrication :
+
+[BULLET LIST]
+Premier element de la liste a puces
+Deuxieme element de la liste a puces
+    Sous-element imbrique numero un
+    Sous-element imbrique numero deux
+Troisieme element de la liste a puces
+[END LIST]
+
+[PARAGRAPH] Liste numerotee :
+
+[NUMBERED LIST]
+Premiere etape de la procedure
+Deuxieme etape de la procedure
+Troisieme etape de la procedure
+[END LIST]
+
+
+[HEADING 2] 5. Tableau
+
+[PARAGRAPH] Le tableau ci-dessous comporte trois colonnes et quatre lignes,
+dont une ligne d'en-tete. Une cellule est deliberement vide et une autre
+contient une barre verticale.
+
+[TABLE 3 COLUMNS]
+Identifiant | Libelle | Valeur
+DOC-001 | Facture annuelle | 1 250,00
+DOC-002 | Cellule contenant une barre | verticale
+DOC-003 |  | cellule precedente vide
+[END TABLE]
+
+
+[HEADING 2] 6. Mise en forme de caracteres
+
+[PARAGRAPH] Cette phrase contient un passage EN GRAS, un passage EN ITALIQUE,
+un passage SOULIGNE et un passage EN GRAS ITALIQUE. La mise en forme peut etre
+perdue, mais aucun de ces mots ne doit disparaitre.
+
+[PARAGRAPH] Lien hypertexte : le site officiel exemple point org, adresse
+https://exemple.org/page?a=1&b=2 et courriel contact@exemple.org.
+
+
+[HEADING 2] 7. Paragraphe long
+
+[PARAGRAPH] Ce paragraphe est volontairement long afin de verifier qu'aucune
+troncature n'intervient au dela d'un certain nombre de caracteres. Les parseurs
+de documents anciens tronquent parfois les paragraphes depassant une taille
+donnee, ou perdent le contenu situe apres un saut de section. Le texte qui suit
+n'a donc pas de valeur semantique, seulement une valeur de volume, et doit etre
+restitue integralement du premier au dernier mot sans omission ni reordonnancement
+des phrases qui le composent. Fin du paragraphe long, marqueur FIN-PARA-LONG.
+
+
+[HEADING 2] 8. Cas limites
+
+[PARAGRAPH] Ligne suivie de trois lignes vides :
+
+
+
+[PARAGRAPH] Espaces multiples entre     les     mots.
+Tabulation entre colonnes :	colonne A	colonne B
+Ligne se terminant par des espaces significatifs.   
+
+[PARAGRAPH] Nombres et dates : 1 234 567,89 ; 2026-09-08 ; 08/09/2026 ; 3,14159.
+
+[PAGE BREAK]
+
+[HEADING 2] 9. Apres saut de page
+
+[PARAGRAPH] Ce texte se trouve apres un saut de page explicite. Il doit
+apparaitre dans la sortie. Marqueur APRES-SAUT-DE-PAGE.
+
+[PARAGRAPH] Note de bas de page : cette phrase porte un appel de note.
+[FOOTNOTE] Contenu de la note de bas de page, marqueur NOTE-BAS-PAGE.
+
+
+SENTINELLE-FIN-7B2E4D
