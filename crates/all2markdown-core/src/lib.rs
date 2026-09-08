@@ -5,6 +5,7 @@
 //! promised to mean.
 
 mod encoding;
+mod envelope;
 mod extraction;
 mod failure;
 mod format;
@@ -13,7 +14,7 @@ mod parser;
 mod parsers;
 mod registry;
 
-pub use extraction::{Extracted, Extraction, Options, SourceDocument, Warning};
+pub use extraction::{Extracted, Extraction, Options, SourceDocument, Warning, DEFAULT_MAX_SIZE};
 pub use failure::Failure;
 pub use format::{Confidence, Format};
 pub use metadata::{DocumentMetadata, FileMetadata};

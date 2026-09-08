@@ -13,6 +13,11 @@ zip = "2"
 thiserror = "2"
 encoding_rs = "0.8.40"
 chardetng = "0.1"
+flate2 = "1.1.10"
+ruzstd = "0.9.0"
+lzma-rs = "0.3.0"
+bzip2-rs = "0.1.2"
 
 [dev-dependencies]
 encoding_rs = "0.8.40"
+flate2 = "1.1.10"

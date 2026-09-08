@@ -1,6 +1,8 @@
+use crate::envelope;
 use crate::extraction::{Extraction, Options, SourceDocument, Warning};
 use crate::failure::Failure;
 use crate::format::{Confidence, Format};
+use crate::metadata::FileMetadata;
 use crate::parser::Parser;
 use crate::parsers;
 
@@ -73,14 +75,26 @@ impl Registry {
 
     /// Identify a Source Document, honouring the strict flag.
     ///
-    /// Strict mode is the whole of its own implementation: it drops the
-    /// `LastResort` stage and touches nothing else, so an unidentified but
-    /// decodable document becomes a Failure while every other answer stands.
+    /// Strips an Envelope first, so that what is identified is the content
+    /// and never the wrapper.
     pub fn detect_with(
         &self,
         source: &SourceDocument<'_>,
         options: &Options,
     ) -> Result<Format, Failure> {
+        match envelope::peel(source.bytes, options.max_size)? {
+            Some(content) => self.poll(&unwrapped(source, &content), options),
+            None => self.poll(source, options),
+        }
+    }
+
+    /// Poll every Parser and keep the most confident, ties broken by
+    /// registration order.
+    ///
+    /// Strict mode is the whole of its own implementation: it drops the
+    /// `LastResort` stage and touches nothing else, so an unidentified but
+    /// decodable document becomes a Failure while every other answer stands.
+    fn poll(&self, source: &SourceDocument<'_>, options: &Options) -> Result<Format, Failure> {
         let floor = if options.strict {
             Confidence::LastResort
         } else {
@@ -108,14 +122,34 @@ impl Registry {
     }
 
     /// Extract the text of one Source Document.
+    ///
+    /// An Envelope is stripped once, up front, so that everything downstream —
+    /// detection, the Parsers, the Extraction — sees a `report.doc.gz` exactly
+    /// as it sees a `report.doc`.
     pub fn extract(
         &self,
         source: SourceDocument<'_>,
         options: &Options,
     ) -> Result<Extraction, Failure> {
+        // File Metadata describes what is on disk, so it is taken before the
+        // Envelope comes off: the size is the compressed one, and the name is
+        // the one that would be typed at a shell.
+        let file = source.file_metadata();
+        match envelope::peel(source.bytes, options.max_size)? {
+            Some(content) => self.extract_content(unwrapped(&source, &content), options, file),
+            None => self.extract_content(source, options, file),
+        }
+    }
+
+    fn extract_content(
+        &self,
+        source: SourceDocument<'_>,
+        options: &Options,
+        file: FileMetadata,
+    ) -> Result<Extraction, Failure> {
         let format = match options.forced_format {
             Some(forced) => forced,
-            None => self.detect_with(&source, options)?,
+            None => self.poll(&source, options)?,
         };
 
         let parser = self
@@ -134,9 +168,18 @@ impl Registry {
             markdown: extracted.markdown,
             format,
             encoding: extracted.encoding,
-            file: source.file_metadata(),
+            file,
             document,
             warnings,
         })
+    }
+}
+
+/// The Source Document that was inside an Envelope: the decompressed bytes,
+/// under the name with the Envelope's extension taken off.
+fn unwrapped<'a>(source: &SourceDocument<'a>, content: &'a [u8]) -> SourceDocument<'a> {
+    SourceDocument {
+        bytes: content,
+        name: source.name.map(envelope::strip_extension),
     }
 }

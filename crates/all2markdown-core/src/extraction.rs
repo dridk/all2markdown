@@ -123,9 +123,15 @@ pub struct Extraction {
     pub warnings: Vec<Warning>,
 }
 
+/// The default cap on a decompressed Source Document: 500 MB.
+///
+/// The real memory bound of a Batch is this multiplied by the worker count,
+/// which is why it is a number the caller can move rather than a constant.
+pub const DEFAULT_MAX_SIZE: u64 = 500 * 1024 * 1024;
+
 /// How to extract. Grows as the milestone adds behaviour; a field appears here
 /// only once something honours it.
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone)]
 pub struct Options {
     /// Bypasses detection. Always wins: the caller knows things the bytes do
     /// not say.
@@ -137,6 +143,19 @@ pub struct Options {
     /// unidentified but decodable document becomes a Failure. For the caller
     /// who wants an exact inventory rather than a permissive read.
     pub strict: bool,
+    /// The cap on a decompressed Source Document, in bytes.
+    pub max_size: u64,
+}
+
+impl Default for Options {
+    fn default() -> Self {
+        Self {
+            forced_format: None,
+            forced_encoding: None,
+            strict: false,
+            max_size: DEFAULT_MAX_SIZE,
+        }
+    }
 }
 
 impl Options {
@@ -154,6 +173,11 @@ impl Options {
 
     pub fn strict(mut self) -> Self {
         self.strict = true;
+        self
+    }
+
+    pub fn with_max_size(mut self, bytes: u64) -> Self {
+        self.max_size = bytes;
         self
     }
 }

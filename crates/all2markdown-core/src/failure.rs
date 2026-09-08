@@ -19,6 +19,18 @@ pub enum Failure {
     #[error("unknown encoding: {0}")]
     UnknownEncoding(String),
 
+    #[error("{envelope} decompression failed: {message}")]
+    Decompress {
+        envelope: &'static str,
+        message: String,
+    },
+
+    #[error("decompressed size exceeds the {limit} byte cap")]
+    TooLarge { limit: u64 },
+
+    #[error("a compressed document may not contain another")]
+    NestedEnvelope,
+
     #[error("{format} parser failed: {message}")]
     Parse { format: Format, message: String },
 
