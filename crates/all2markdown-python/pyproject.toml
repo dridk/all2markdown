@@ -4,8 +4,23 @@ build-backend = "maturin"
 
 [project]
 name = "all2markdown"
+description = "Extracts text from any text-bearing file and renders it as Markdown, at the scale of a million documents"
 requires-python = ">=3.10"
+dynamic = ["version"]
+license = "MIT"
+classifiers = [
+    "Programming Language :: Rust",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: Implementation :: CPython",
+]
+
+[dependency-groups]
+# The Python test seam and nothing else; the package itself depends on nothing.
+test = ["pytest", "boto3", "moto"]
 
 [tool.maturin]
 manifest-path = "Cargo.toml"
 features = ["pyo3/extension-module"]
+
+[tool.pytest.ini_options]
+testpaths = ["python/tests"]
