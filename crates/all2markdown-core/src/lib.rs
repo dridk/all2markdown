@@ -16,6 +16,7 @@ mod parser;
 mod parsers;
 mod registry;
 mod render;
+mod template;
 
 pub use batch::{BatchItem, Results};
 pub use extraction::{Extracted, Extraction, Options, SourceDocument, Warning, DEFAULT_MAX_SIZE};
@@ -24,7 +25,8 @@ pub use format::{Confidence, Format};
 pub use metadata::{DocumentMetadata, FileMetadata};
 pub use parser::Parser;
 pub use registry::Registry;
-pub use render::to_jsonl;
+pub use render::{to_jsonl, to_markdown, FrontMatter};
+pub use template::{OutputTemplate, TemplateError};
 
 use std::path::PathBuf;
 use std::sync::{Arc, OnceLock};

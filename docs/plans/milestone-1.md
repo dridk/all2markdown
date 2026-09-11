@@ -100,6 +100,8 @@ warning emission (notably: PDF with no text layer).
 
 ### 6. Rendering
 
+_Done._
+
 Two outputs from the same `Extraction`: a Markdown file with YAML front matter
 (core metadata only), and a JSONL line (core plus raw bag). A single rendering
 path, so the two can never diverge.
