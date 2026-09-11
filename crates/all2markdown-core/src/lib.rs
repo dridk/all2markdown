@@ -19,13 +19,15 @@ mod render;
 mod template;
 
 pub use batch::{BatchItem, Results};
-pub use extraction::{Extracted, Extraction, Options, SourceDocument, Warning, DEFAULT_MAX_SIZE};
+pub use extraction::{
+    Extracted, Extraction, Inventory, Options, SourceDocument, Warning, DEFAULT_MAX_SIZE,
+};
 pub use failure::Failure;
 pub use format::{Confidence, Format};
 pub use metadata::{DocumentMetadata, FileMetadata};
 pub use parser::Parser;
 pub use registry::Registry;
-pub use render::{to_jsonl, to_markdown, FrontMatter};
+pub use render::{to_jsonl, to_markdown, FrontMatter, Record};
 pub use template::{OutputTemplate, TemplateError};
 
 use std::path::PathBuf;
@@ -49,6 +51,15 @@ fn default_registry() -> &'static Arc<Registry> {
 /// nothing.
 pub fn extract(source: SourceDocument<'_>, options: &Options) -> Result<Extraction, Failure> {
     default_registry().extract(source, options)
+}
+
+/// Read what one Source Document declares about itself, without parsing its
+/// body.
+///
+/// The same detection as [`extract`], and none of the extraction: the body
+/// is where the time goes, and every format keeps its metadata apart from it.
+pub fn inventory(source: SourceDocument<'_>, options: &Options) -> Result<Inventory, Failure> {
+    default_registry().inventory(source, options)
 }
 
 /// Identify a Source Document by polling the built-in Parsers.
@@ -76,4 +87,18 @@ where
     I::IntoIter: Send,
 {
     batch::extract_paths(Arc::clone(default_registry()), paths, options, workers)
+}
+
+/// Inventory many Source Documents at once: the same Batch as
+/// [`extract_paths`], the same iterator out, reading metadata alone.
+///
+/// An order of magnitude faster than extraction on the same corpus, which is
+/// what makes it worth having: it turns "inventory three terabytes" from an
+/// overnight job into a coffee break.
+pub fn inventory_paths<I>(paths: I, options: &Options, workers: Option<usize>) -> Results<Inventory>
+where
+    I: IntoIterator<Item = PathBuf> + Send + 'static,
+    I::IntoIter: Send,
+{
+    batch::inventory_paths(Arc::clone(default_registry()), paths, options, workers)
 }

@@ -310,3 +310,51 @@ fn jsonl_needs_no_output_directory_and_carries_the_raw_bag() {
     assert_eq!(pdf["document"]["raw"]["creator"], "Writer");
     assert!(pdf["file"]["name"] == "report.pdf");
 }
+
+#[test]
+fn metadata_only_inventories_a_directory_as_jsonl_without_an_output_directory() {
+    let corpus = corpus();
+    let output = all2markdown(&[corpus.path().to_str().unwrap(), "--metadata-only"]);
+    assert!(output.status.success(), "{}", stderr(&output));
+
+    let lines: Vec<serde_json::Value> = stdout(&output)
+        .lines()
+        .map(|line| serde_json::from_str(line).unwrap())
+        .collect();
+    assert_eq!(lines.len(), 2);
+    for line in &lines {
+        assert!(line["text"].is_null(), "no body was read: {line}");
+        assert!(line["error"].is_null());
+        assert!(line["file"]["size"].is_number());
+    }
+    let pdf = lines
+        .iter()
+        .find(|line| line["format"] == "pdf")
+        .expect("the PDF's record");
+    assert_eq!(pdf["document"]["page_count"], 1);
+    assert_eq!(pdf["document"]["raw"]["creator"], "Writer");
+    let doc = lines
+        .iter()
+        .find(|line| line["format"] == "doc")
+        .expect("a format that declares nothing still has a record");
+    assert!(doc["document"]["title"].is_null());
+}
+
+#[test]
+fn metadata_only_refuses_markdown_output() {
+    let corpus = corpus();
+    let out = tempfile::tempdir().unwrap();
+
+    for extra in [
+        vec!["-o", out.path().to_str().unwrap()],
+        vec!["--no-front-matter"],
+        vec!["-t", "{name}.md"],
+    ] {
+        let mut args = vec![corpus.path().to_str().unwrap(), "--metadata-only"];
+        args.extend(extra.iter().copied());
+        let output = all2markdown(&args);
+        assert!(!output.status.success(), "{extra:?} must be refused");
+        assert!(stdout(&output).is_empty());
+    }
+    assert!(files_under(out.path()).is_empty());
+}

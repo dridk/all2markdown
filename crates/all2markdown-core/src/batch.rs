@@ -1,4 +1,4 @@
-use crate::extraction::{Extraction, Options, SourceDocument};
+use crate::extraction::{Extraction, Inventory, Options, SourceDocument};
 use crate::failure::Failure;
 use crate::registry::Registry;
 use rayon::prelude::*;
@@ -21,11 +21,14 @@ const QUEUE_PER_WORKER: usize = 2;
 ///
 /// Carries its own Failure rather than aborting: a corrupt document must not
 /// destroy the other nine hundred thousand.
+///
+/// An [`Extraction`] by default; an [`Inventory`] when the Batch was asked
+/// for metadata alone.
 #[derive(Debug)]
-pub struct BatchItem {
+pub struct BatchItem<T = Extraction> {
     /// The path the document was read from, as the caller gave it.
     pub source: String,
-    pub result: Result<Extraction, Failure>,
+    pub result: Result<T, Failure>,
 }
 
 /// The results of a Batch, as they finish.
@@ -34,20 +37,20 @@ pub struct BatchItem {
 /// in memory, and a caller who stops early must be able to stop the work too.
 /// Dropping it does exactly that — the workers find the queue gone and give
 /// up, promptly.
-pub struct Results {
-    results: Option<IntoIter<BatchItem>>,
+pub struct Results<T = Extraction> {
+    results: Option<IntoIter<BatchItem<T>>>,
     producer: Option<JoinHandle<()>>,
 }
 
-impl Iterator for Results {
-    type Item = BatchItem;
+impl<T> Iterator for Results<T> {
+    type Item = BatchItem<T>;
 
-    fn next(&mut self) -> Option<BatchItem> {
+    fn next(&mut self) -> Option<BatchItem<T>> {
         self.results.as_mut()?.next()
     }
 }
 
-impl Drop for Results {
+impl<T> Drop for Results<T> {
     fn drop(&mut self) {
         // The order is the whole of it, and it cannot be left to field order,
         // which runs after this method: the queue has to go first, because
@@ -61,6 +64,9 @@ impl Drop for Results {
     }
 }
 
+/// What a Batch does to each Source Document once it is in memory.
+type Job<T> = fn(&Registry, SourceDocument<'_>, &Options) -> Result<T, Failure>;
+
 /// Extract many Source Documents at once, reading each from its path.
 ///
 /// Runs on `workers` threads, or on one per core when that is `None`, and
@@ -71,13 +77,47 @@ pub(crate) fn extract_paths<I>(
     paths: I,
     options: &Options,
     workers: Option<usize>,
-) -> Results
+) -> Results<Extraction>
 where
     I: IntoIterator<Item = PathBuf> + Send + 'static,
     I::IntoIter: Send,
 {
+    run(registry, paths, options, workers, Registry::extract)
+}
+
+/// Inventory many Source Documents at once: the same Batch as
+/// [`extract_paths`], reading metadata alone.
+pub(crate) fn inventory_paths<I>(
+    registry: Arc<Registry>,
+    paths: I,
+    options: &Options,
+    workers: Option<usize>,
+) -> Results<Inventory>
+where
+    I: IntoIterator<Item = PathBuf> + Send + 'static,
+    I::IntoIter: Send,
+{
+    run(registry, paths, options, workers, Registry::inventory)
+}
+
+/// The one Batch, whatever it does to each document: the same threads, the
+/// same bounded queue, the same size cap and the same panic guard, so that an
+/// inventory and an extraction of the same corpus cannot differ in anything
+/// but the work done per document.
+fn run<T, I>(
+    registry: Arc<Registry>,
+    paths: I,
+    options: &Options,
+    workers: Option<usize>,
+    job: Job<T>,
+) -> Results<T>
+where
+    T: Send + 'static,
+    I: IntoIterator<Item = PathBuf> + Send + 'static,
+    I::IntoIter: Send,
+{
     let threads = workers.unwrap_or_else(num_cpus).max(1);
-    let (sender, receiver): (SyncSender<BatchItem>, Receiver<BatchItem>) =
+    let (sender, receiver): (SyncSender<BatchItem<T>>, Receiver<BatchItem<T>>) =
         sync_channel(threads * QUEUE_PER_WORKER);
     let options = options.clone();
 
@@ -94,7 +134,10 @@ where
                 .par_bridge()
                 .try_for_each_with(sender, |sender, path| {
                     sender
-                        .send(extract_path(&registry, &path, &options))
+                        .send(BatchItem {
+                            source: path.display().to_string(),
+                            result: read_and_run(&registry, &path, &options, job),
+                        })
                         .map_err(|_| ())
                 });
         });
@@ -110,18 +153,12 @@ fn num_cpus() -> usize {
     std::thread::available_parallelism().map_or(1, |count| count.get())
 }
 
-fn extract_path(registry: &Registry, path: &Path, options: &Options) -> BatchItem {
-    BatchItem {
-        source: path.display().to_string(),
-        result: read_and_extract(registry, path, options),
-    }
-}
-
-fn read_and_extract(
+fn read_and_run<T>(
     registry: &Registry,
     path: &Path,
     options: &Options,
-) -> Result<Extraction, Failure> {
+    job: Job<T>,
+) -> Result<T, Failure> {
     let file = std::fs::metadata(path)?;
 
     // Checked before the read, not after: the cap is meant to bound memory,
@@ -144,7 +181,7 @@ fn read_and_extract(
     // A Parser must never panic on malformed input, and that is a constraint
     // this crate holds rather than hopes for: a panic here becomes this one
     // document's Failure instead of the whole process's last act.
-    match catch_unwind(AssertUnwindSafe(|| registry.extract(source, options))) {
+    match catch_unwind(AssertUnwindSafe(|| job(registry, source, options))) {
         Ok(result) => result,
         Err(payload) => Err(Failure::Panic(panic_message(payload))),
     }

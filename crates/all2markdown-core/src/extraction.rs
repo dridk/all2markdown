@@ -138,6 +138,21 @@ pub struct Extraction {
     pub warnings: Vec<Warning>,
 }
 
+/// What all2markdown produces for one Source Document when only its metadata
+/// is asked for: the format, and what the filesystem and the document itself
+/// declare. The body is never parsed.
+///
+/// Every format keeps its metadata in a stream apart from the body, which is
+/// what makes an inventory of three terabytes a coffee break rather than an
+/// overnight job. There is no text and no encoding here, on purpose: both
+/// would require reading the body.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Inventory {
+    pub format: Format,
+    pub file: FileMetadata,
+    pub document: DocumentMetadata,
+}
+
 /// The default cap on a decompressed Source Document: 500 MB.
 ///
 /// The real memory bound of a Batch is this multiplied by the worker count,

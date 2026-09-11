@@ -4,8 +4,8 @@ use std::io::{BufWriter, ErrorKind, Write};
 use std::path::{Path, PathBuf};
 
 use all2markdown_core::{
-    extract_paths, format_from_id, to_jsonl, to_markdown, BatchItem, FrontMatter, Options,
-    OutputTemplate, Results,
+    extract_paths, format_from_id, inventory_paths, to_jsonl, to_markdown, BatchItem, FrontMatter,
+    Options, OutputTemplate, Record, Results,
 };
 
 #[derive(Parser)]
@@ -59,6 +59,12 @@ struct Cli {
     /// understand front matter.
     #[arg(long = "no-front-matter")]
     no_front_matter: bool,
+
+    /// Inventory: read what each document declares about itself, without
+    /// parsing its body. An order of magnitude faster than extraction. JSONL
+    /// on stdout, always; there is no Markdown to write.
+    #[arg(long = "metadata-only", conflicts_with_all = ["output", "template", "no_front_matter"])]
+    metadata_only: bool,
 }
 
 pub fn run() -> Result<()> {
@@ -88,7 +94,7 @@ pub fn run() -> Result<()> {
             &output,
             target.parent().unwrap_or(Path::new(".")),
         )?),
-        None if is_directory && !cli.jsonl => bail!(
+        None if is_directory && !cli.jsonl && !cli.metadata_only => bail!(
             "an output directory is required: -o <DIR> to write one Markdown file per \
              document, or --jsonl for one JSON line per document on stdout"
         ),
@@ -102,6 +108,9 @@ pub fn run() -> Result<()> {
     } else {
         vec![target]
     };
+    if cli.metadata_only {
+        return stream_jsonl(inventory_paths(entries, &options, cli.workers));
+    }
     let results = extract_paths(entries, &options, cli.workers);
 
     if cli.jsonl {
@@ -181,7 +190,7 @@ fn write_files(
 /// Results are written as they arrive rather than collected: memory stays
 /// bounded, and a reader downstream sees the first document before the last
 /// one has been opened.
-fn stream_jsonl(results: Results) -> Result<()> {
+fn stream_jsonl<T: Record>(results: Results<T>) -> Result<()> {
     let stdout = std::io::stdout();
     let mut out = BufWriter::new(stdout.lock());
 

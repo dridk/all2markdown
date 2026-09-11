@@ -35,6 +35,7 @@ all2markdown -i file.doc -f doc > out.md      # explicit format
 all2markdown ./corpus -o ./out -j 8           # a directory, one .md per document
 all2markdown ./corpus -o ./out -t '{stem}-{format}.md' --no-front-matter
 all2markdown ./corpus -j 8 --jsonl > out.jsonl  # a directory, as JSONL on stdout
+all2markdown ./corpus --metadata-only > inventory.jsonl  # metadata alone, no body parsed
 ```
 
 ## Architecture
@@ -59,7 +60,13 @@ Current state, being reshaped by milestone 1:
   completion order, each document's panic caught so it costs one document
 - `render.rs` is the one rendering path: a single `Provenance` struct feeds
   both the YAML front matter of `to_markdown` and the line of `to_jsonl`, so
-  the two cannot drift. The raw metadata bag goes to JSONL only.
+  the two cannot drift. The raw metadata bag goes to JSONL only. An
+  `Inventory` renders to the same JSONL line as an `Extraction`, `text` null.
+- `Registry::inventory` is the Inventory path: same Envelope stripping, same
+  detection, then the Parser's `metadata` and never its `extract`. The Batch
+  in `batch.rs` is one function generic over what it does per document, so
+  `inventory_paths` and `extract_paths` share threads, queue, cap and panic
+  guard. `--metadata-only` in the CLI; it refuses `-o`.
 - `template.rs` is the Output Template: `{name} {stem} {ext} {parent} {format}`,
   parsed once at startup so an unknown variable is refused before any document
   is read. The default `{name}.md` keeps the source extension, which is what

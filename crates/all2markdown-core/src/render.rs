@@ -1,5 +1,6 @@
 use crate::batch::BatchItem;
-use crate::extraction::Extraction;
+use crate::extraction::{Extraction, Inventory};
+use crate::format::Format;
 use crate::metadata::{DocumentMetadata, FileMetadata};
 use serde::Serialize;
 use serde_json::Value;
@@ -15,7 +16,8 @@ use std::fmt::Write;
 /// struct, because a header that dumps everything a format exposes stops
 /// being readable.
 #[derive(Serialize)]
-struct Provenance<'a> {
+#[doc(hidden)]
+pub struct Provenance<'a> {
     format: &'a str,
     encoding: Option<&'a str>,
     file: File<'a>,
@@ -44,12 +46,19 @@ struct Document<'a> {
 }
 
 impl<'a> Provenance<'a> {
-    fn of(extraction: &'a Extraction, raw: bool) -> Self {
+    fn new(
+        format: Format,
+        encoding: Option<&'a str>,
+        file: &'a FileMetadata,
+        document: &'a DocumentMetadata,
+        warnings: Vec<String>,
+        raw: bool,
+    ) -> Self {
         let FileMetadata {
             name,
             size,
             modified,
-        } = &extraction.file;
+        } = file;
         let DocumentMetadata {
             title,
             author,
@@ -58,10 +67,10 @@ impl<'a> Provenance<'a> {
             page_count,
             language,
             raw: bag,
-        } = &extraction.document;
+        } = document;
         Provenance {
-            format: extraction.format.id(),
-            encoding: extraction.encoding.as_deref(),
+            format: format.id(),
+            encoding,
             file: File {
                 name: name.as_deref(),
                 size: *size,
@@ -76,12 +85,60 @@ impl<'a> Provenance<'a> {
                 language: language.as_deref(),
                 raw: raw.then_some(bag),
             },
-            warnings: extraction
-                .warnings
-                .iter()
-                .map(ToString::to_string)
-                .collect(),
+            warnings,
         }
+    }
+}
+
+mod sealed {
+    pub trait Sealed {}
+    impl Sealed for super::Extraction {}
+    impl Sealed for super::Inventory {}
+}
+
+/// What a Batch result can be rendered from: an [`Extraction`], or an
+/// [`Inventory`], which is one without the text.
+///
+/// Sealed: the two are the only shapes this crate produces, and the JSONL
+/// line has one schema whichever it was given.
+pub trait Record: sealed::Sealed {
+    #[doc(hidden)]
+    fn provenance(&self, raw: bool) -> Provenance<'_>;
+    #[doc(hidden)]
+    fn text(&self) -> Option<&str>;
+}
+
+impl Record for Extraction {
+    fn provenance(&self, raw: bool) -> Provenance<'_> {
+        Provenance::new(
+            self.format,
+            self.encoding.as_deref(),
+            &self.file,
+            &self.document,
+            self.warnings.iter().map(ToString::to_string).collect(),
+            raw,
+        )
+    }
+
+    fn text(&self) -> Option<&str> {
+        Some(&self.markdown)
+    }
+}
+
+impl Record for Inventory {
+    fn provenance(&self, raw: bool) -> Provenance<'_> {
+        Provenance::new(
+            self.format,
+            None,
+            &self.file,
+            &self.document,
+            Vec::new(),
+            raw,
+        )
+    }
+
+    fn text(&self) -> Option<&str> {
+        None
     }
 }
 
@@ -108,7 +165,7 @@ pub fn to_markdown(extraction: &Extraction, front_matter: FrontMatter) -> String
     let mut out = String::with_capacity(extraction.markdown.len() + 256);
     if front_matter == FrontMatter::On {
         out.push_str("---\n");
-        out.push_str(&yaml(&Provenance::of(extraction, false)));
+        out.push_str(&yaml(&extraction.provenance(false)));
         out.push_str("---\n");
         if !extraction.markdown.is_empty() {
             out.push('\n');
@@ -138,18 +195,20 @@ struct Line<'a> {
 /// Render one Batch result as a JSONL line, without its newline.
 ///
 /// Carries what the front matter carries, plus the raw metadata bag, which
-/// belongs to a machine-read line and not to a human-read header.
-pub fn to_jsonl(item: &BatchItem) -> String {
+/// belongs to a machine-read line and not to a human-read header. An
+/// Inventory renders to the same line with `text` null: one schema for a
+/// corpus whichever way it was read.
+pub fn to_jsonl<T: Record>(item: &BatchItem<T>) -> String {
     let line = match &item.result {
-        Ok(extraction) => {
-            let provenance = Provenance::of(extraction, true);
+        Ok(record) => {
+            let provenance = record.provenance(true);
             Line {
                 source: &item.source,
                 format: Some(provenance.format),
                 encoding: provenance.encoding,
                 file: Some(provenance.file),
                 document: Some(provenance.document),
-                text: Some(&extraction.markdown),
+                text: record.text(),
                 warnings: provenance.warnings,
                 error: None,
             }
