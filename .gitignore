@@ -6,3 +6,7 @@
 
 # Benchmark corpus lives outside the repo; see docs/plans/milestone-1.md
 /corpora
+
+# Python test seam leftovers
+__pycache__/
+.pytest_cache/

@@ -1,5 +1,5 @@
 use crate::envelope;
-use crate::extraction::{Extraction, Options, SourceDocument, Warning};
+use crate::extraction::{Extraction, Inventory, Options, SourceDocument, Warning};
 use crate::failure::Failure;
 use crate::format::{Confidence, Format};
 use crate::metadata::FileMetadata;
@@ -141,20 +141,63 @@ impl Registry {
         }
     }
 
+    /// Read what one Source Document declares about itself, without parsing
+    /// its body.
+    ///
+    /// Same Envelope handling and same detection as [`Registry::extract`];
+    /// the one thing it never does is call a Parser's `extract`, which is
+    /// where all the time goes.
+    pub fn inventory(
+        &self,
+        source: SourceDocument<'_>,
+        options: &Options,
+    ) -> Result<Inventory, Failure> {
+        let file = source.file_metadata();
+        match envelope::peel(source.bytes, options.max_size)? {
+            Some(content) => self.inventory_content(unwrapped(&source, &content), options, file),
+            None => self.inventory_content(source, options, file),
+        }
+    }
+
+    fn inventory_content(
+        &self,
+        source: SourceDocument<'_>,
+        options: &Options,
+        file: FileMetadata,
+    ) -> Result<Inventory, Failure> {
+        let (format, parser) = self.identify(&source, options)?;
+        let document = parser.metadata(&source)?;
+        Ok(Inventory {
+            format,
+            file,
+            document,
+        })
+    }
+
+    /// The Supported Format of a Source Document, forced or detected, and the
+    /// Parser that reads it.
+    fn identify(
+        &self,
+        source: &SourceDocument<'_>,
+        options: &Options,
+    ) -> Result<(Format, &dyn Parser), Failure> {
+        let format = match options.forced_format {
+            Some(forced) => forced,
+            None => self.poll(source, options)?,
+        };
+        let parser = self
+            .parser_for(format)
+            .ok_or_else(|| Failure::UnsupportedFormat(format.id().to_owned()))?;
+        Ok((format, parser))
+    }
+
     fn extract_content(
         &self,
         source: SourceDocument<'_>,
         options: &Options,
         file: FileMetadata,
     ) -> Result<Extraction, Failure> {
-        let format = match options.forced_format {
-            Some(forced) => forced,
-            None => self.poll(&source, options)?,
-        };
-
-        let parser = self
-            .parser_for(format)
-            .ok_or_else(|| Failure::UnsupportedFormat(format.id().to_owned()))?;
+        let (format, parser) = self.identify(&source, options)?;
 
         let extracted = parser.extract(&source, options)?;
         let document = parser.metadata(&source)?;

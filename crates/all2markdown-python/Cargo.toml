@@ -10,4 +10,7 @@ crate-type = ["cdylib"]
 
 [dependencies]
 all2markdown-core = { path = "../all2markdown-core" }
-pyo3 = { version = "0.23", features = ["extension-module"] }
+# abi3 from 3.10 up: one wheel per platform rather than one per interpreter
+# (ADR-0003). The binding therefore keeps to the limited API, which is why it
+# reads bytes-like objects through their types rather than the buffer protocol.
+pyo3 = { version = "0.23", features = ["extension-module", "abi3-py310"] }

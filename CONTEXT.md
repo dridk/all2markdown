@@ -53,6 +53,13 @@ Format chosen, the detected encoding, the metadata and the Warnings. Never a
 bare string.
 _Avoid_: output, result, document
 
+**Inventory** (`Inventory`):
+What all2markdown produces for one Source Document when only its metadata is
+asked for: the Supported Format, the File Metadata and the Document Metadata.
+The body is never parsed, which is what makes an Inventory of a corpus an
+order of magnitude faster than its Extraction.
+_Avoid_: listing, index, scan, metadata-only result
+
 **Warning** (`Warning`):
 Marks an Extraction that succeeded but is suspect, typically a non-empty
 document that yielded zero characters.

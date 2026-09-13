@@ -100,6 +100,8 @@ warning emission (notably: PDF with no text layer).
 
 ### 6. Rendering
 
+_Done._
+
 Two outputs from the same `Extraction`: a Markdown file with YAML front matter
 (core metadata only), and a JSONL line (core plus raw bag). A single rendering
 path, so the two can never diverge.
@@ -120,10 +122,13 @@ template, `--format`, `--strict`, `--metadata-only`, `--no-front-matter`,
 
 ### 9. Python binding
 
+_Done._
+
 `extract`, `extract_bytes`, `extract_many` (accepts any iterable, returns an
 iterator, releases the GIL), `workers=`. `.pyi` stubs shipped.
 
-*Check*: `examples/s3_batch.py` runs unmodified against a local MinIO.
+*Check*: `examples/s3_batch.py` runs unmodified against a local object store
+(the Python test seam runs it against an in-process one, `moto`).
 
 ### 10. Packaging and CI
 

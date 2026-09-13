@@ -24,16 +24,50 @@ cd crates/all2markdown-python && maturin develop  # Python wheel (dev)
 
 ```bash
 cargo test
-cd crates/all2markdown-python && maturin develop && python -m pytest python/tests/
+cd crates/all2markdown-python && pip install --group test . && maturin develop && python -m pytest python/tests/
 ```
+
+The Python seam is five tests and stays that size: it covers only what no
+Rust test can see from the other side of the binding (the batch is lazy, the
+GIL is released, the S3 example runs against a local object store).
 
 ## CLI Usage
 
 ```bash
-all2markdown -i file.docx > out.md            # auto-detect format
+all2markdown -i file.docx > out.md            # auto-detect format, front matter on
 all2markdown -i file.doc -f doc > out.md      # explicit format
-all2markdown ./corpus -j 8 > out.jsonl        # a directory, in parallel, as JSONL
+all2markdown ./corpus -o ./out -j 8           # a directory, one .md per document
+all2markdown ./corpus -o ./out -t '{stem}-{format}.md' --no-front-matter
+all2markdown ./corpus -j 8 --jsonl > out.jsonl  # a directory, as JSONL on stdout
+all2markdown ./corpus --metadata-only > inventory.jsonl  # metadata alone, no body parsed
+find ./corpus -name '*.docx' | all2markdown --paths-from - -o ./out  # a list of paths, recursion is find's
+curl -s https://store/report.docx | all2markdown - --name report.docx > out.md  # a document on stdin
 ```
+
+Exit codes: 0 every document extracted; 1 the command failed or the one
+document asked for could not be read; 2 the arguments were refused; 3 the
+batch ran to its end and some of its documents failed.
+
+## Python Usage
+
+```python
+import all2markdown
+
+extraction = all2markdown.extract("report.docx")            # a path; raises all2markdown.Failure
+extraction = all2markdown.extract_bytes(data, "report.docx")  # bytes that never touch the disk
+extraction.markdown, extraction.format, extraction.warnings, extraction.document_metadata
+extraction.to_markdown()        # with the front matter the CLI writes
+extraction.to_jsonl()           # the JSONL line the CLI writes
+
+# Any iterable in, an iterator out. Items are paths, bytes, or (name, bytes)
+# pairs; a generator that downloads as it goes is the intended input.
+for extraction in all2markdown.extract_many(documents(), workers=8):
+    if extraction.error is not None:   # a Failure is an item, never an exception
+        ...
+```
+
+`examples/s3_batch.py` is the reference use: downloading in Python threads
+and extracting in Rust overlap in one process, because both release the GIL.
 
 ## Architecture
 
@@ -54,7 +88,46 @@ Current state, being reshaped by milestone 1:
 - `envelope.rs` strips gzip/zstd/xz/bzip2 before detection, one deep, capped on
   the *decompressed* size as it inflates
 - `batch.rs` is the parallel path: rayon over a bounded queue, results in
-  completion order, each document's panic caught so it costs one document
+  completion order, each document's panic caught so it costs one document.
+  Its input is an iterator of `Source`, a path or bytes with a name, so the
+  same Batch serves a directory walk and an object store; `extract_paths` is
+  `extract_sources` over paths. `extract_source` is one document through the
+  same read, cap and panic guard, without the threads. `Results::next_within`
+  is `next` with a timeout, for a consumer that must look up now and then.
+- `render.rs` is the one rendering path: a single `Provenance` struct feeds
+  both the YAML front matter of `to_markdown` and the line of `to_jsonl`, so
+  the two cannot drift. The raw metadata bag goes to JSONL only. An
+  `Inventory` renders to the same JSONL line as an `Extraction`, `text` null.
+- `Registry::inventory` is the Inventory path: same Envelope stripping, same
+  detection, then the Parser's `metadata` and never its `extract`. The Batch
+  in `batch.rs` is one function generic over what it does per document, so
+  `inventory_paths` and `extract_paths` share threads, queue, cap and panic
+  guard. `--metadata-only` in the CLI; it refuses `-o`.
+- `template.rs` is the Output Template: `{name} {stem} {ext} {parent} {format}`,
+  parsed once at startup so an unknown variable is refused before any document
+  is read. The default `{name}.md` keeps the source extension, which is what
+  makes `report.doc` and `report.pdf` unable to overwrite one another.
+- The CLI requires `-o <DIR>` for a directory or a path list unless `--jsonl`;
+  a single document goes to stdout. `-o` may never be the source directory.
+- The CLI's `Input` is decided by the arguments alone, never by peeking at
+  stdin: `-` is a document on stdin, `--paths-from FILE` (`-` for stdin) is a
+  list of paths, one per line, streamed into the Batch as it is read. A stdin
+  document is the one thing that bypasses `batch.rs`: it is read whole under
+  the same size cap, then handed to `extract`/`inventory`. `--name` gives it
+  the name detection and the front matter need; `-o` is refused for it.
+- Progress is one line on stderr, redrawn in place, only when stderr is a
+  terminal; warnings and per-document errors go to stderr in every mode, so
+  piped stdout carries nothing but Markdown or JSONL.
+- `crates/all2markdown-python` is the binding and nothing more: `extract`,
+  `extract_bytes`, `extract_many`, an `Extraction` class wrapping a
+  `BatchItem` so the front matter and JSONL come from the core's one rendering
+  path, and a `Failure` exception for the single-document calls. `extract_many`
+  puts a feeder thread between the Python iterable and the core Batch: it
+  takes the GIL per item and hands `Source`s down a bounded channel, so the
+  iterable is pulled only as the workers need it, and the workers never wait
+  on the GIL. The consumer releases the GIL while it waits, polling every
+  100 ms so Ctrl-C is delivered. Type stubs are `all2markdown.pyi` next to
+  the crate's `Cargo.toml`; maturin ships them in the wheel. abi3 from 3.10.
 - DOCX parser skips `RunChild::Drawing` and `RunChild::Shape` to exclude
   textbox text
 - DOC uses `unword`, DOCX uses `docx-rs`, RTF uses `rtf-parser`, PDF uses

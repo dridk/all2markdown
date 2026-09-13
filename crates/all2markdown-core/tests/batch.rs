@@ -1,7 +1,10 @@
 //! A Batch: every core from one process, results as they finish, and one
 //! document's fate never anyone else's.
 
-use all2markdown_core::{extract_paths, to_jsonl, BatchItem, Failure, Format, Options};
+use all2markdown_core::{
+    extract_paths, extract_source, extract_sources, format_from_id, to_jsonl, BatchItem, Failure,
+    Format, Options, Source, Timeout,
+};
 use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 
@@ -314,4 +317,152 @@ fn a_slow_consumer_does_not_grow_the_queue_without_bound() {
         std::thread::sleep(Duration::from_millis(1));
     }
     assert_eq!(seen, 20);
+}
+
+#[test]
+fn bytes_go_through_the_same_batch_as_paths() {
+    // The object-store road in: documents handed over in memory, never
+    // touching the disk, extracted by the same Batch and labelled by the
+    // name the caller gave them.
+    let directory = corpus(&[]);
+    let mut sources: Vec<Source> = paths_in(directory.path())
+        .into_iter()
+        .map(Source::Path)
+        .collect();
+    sources.push(Source::named("store/1000.docx", fixture("1000.docx")));
+    sources.push(Source::named("store/1000.pdf", fixture("1000.pdf")));
+    sources.push(Source::unnamed(fixture("1000.rtf")));
+
+    let results: Vec<BatchItem> = extract_sources(sources, &Options::default(), Some(2)).collect();
+
+    assert_eq!(results.len(), 7);
+    for item in &results {
+        let extraction = item
+            .result
+            .as_ref()
+            .unwrap_or_else(|e| panic!("{}: {e}", item.source));
+        assert!(
+            extraction.markdown.contains("je mange du chocolat"),
+            "{}: text lost",
+            item.source
+        );
+    }
+    let from_store = results
+        .iter()
+        .find(|item| item.source == "store/1000.docx")
+        .expect("labelled by the name given with the bytes");
+    assert_eq!(
+        from_store.result.as_ref().unwrap().format,
+        format_from_id("docx").unwrap()
+    );
+    assert_eq!(
+        from_store.result.as_ref().unwrap().file.name.as_deref(),
+        Some("store/1000.docx")
+    );
+    let unnamed = results
+        .iter()
+        .find(|item| item.source.is_empty())
+        .expect("bytes given no name have nothing to be called by");
+    assert_eq!(
+        unnamed.result.as_ref().unwrap().format,
+        format_from_id("rtf").unwrap(),
+        "detection rests on the signature alone"
+    );
+}
+
+#[test]
+fn bytes_over_the_cap_fail_alone_as_a_file_would() {
+    let options = Options {
+        max_size: 10_000,
+        ..Options::default()
+    };
+    let results: Vec<BatchItem> = extract_sources(
+        vec![
+            Source::named("small.docx", fixture("1000.docx")),
+            Source::named("big.pdf", fixture("1000.pdf")),
+        ],
+        &options,
+        Some(2),
+    )
+    .collect();
+
+    let big = results
+        .iter()
+        .find(|item| item.source == "big.pdf")
+        .unwrap();
+    assert!(
+        matches!(big.result, Err(Failure::TooLarge { limit: 10_000 })),
+        "{:?}",
+        big.result
+    );
+    let small = results
+        .iter()
+        .find(|item| item.source == "small.docx")
+        .unwrap();
+    assert!(small.result.is_ok());
+}
+
+#[test]
+fn one_source_is_read_exactly_as_the_batch_reads_it() {
+    let directory = corpus(&[]);
+    let path = directory.path().join("1000.doc");
+
+    let item = extract_source(Source::Path(path.clone()), &Options::default());
+    assert_eq!(item.source, path.display().to_string());
+    let extraction = item.result.expect("the fixture extracts");
+    assert_eq!(extraction.file.name.as_deref(), Some("1000.doc"));
+    assert!(
+        extraction.file.modified.is_some(),
+        "a path brings its modification time, as it does in a Batch"
+    );
+
+    let item = extract_source(
+        Source::named("1000.doc", fixture("1000.doc")),
+        &Options::default(),
+    );
+    assert_eq!(item.source, "1000.doc");
+    let from_bytes = item.result.expect("the same bytes extract");
+    assert_eq!(from_bytes.markdown, extraction.markdown);
+    assert!(
+        from_bytes.file.modified.is_none(),
+        "bytes carry no modification time"
+    );
+
+    let item = extract_source(
+        Source::Path(directory.path().join("absent.doc")),
+        &Options::default(),
+    );
+    assert!(
+        matches!(item.result, Err(Failure::Io(_))),
+        "{:?}",
+        item.result
+    );
+}
+
+#[test]
+fn a_caller_can_wait_with_a_timeout_and_come_back() {
+    // For a consumer that cannot block for good: nothing finished yet is a
+    // Timeout, the end of the Batch is None, exactly as `next` says it.
+    let (sender, receiver) = std::sync::mpsc::sync_channel::<Source>(1);
+    let mut results = extract_sources(receiver, &Options::default(), Some(1));
+
+    assert!(
+        matches!(results.next_within(Duration::from_millis(50)), Err(Timeout)),
+        "nothing has been fed, so nothing has finished"
+    );
+
+    sender
+        .send(Source::named("1000.rtf", fixture("1000.rtf")))
+        .unwrap();
+    let item = results
+        .next_within(Duration::from_secs(10))
+        .expect("something finished in time")
+        .expect("the batch is not over");
+    assert!(item.result.is_ok());
+
+    drop(sender);
+    assert!(
+        matches!(results.next_within(Duration::from_secs(10)), Ok(None)),
+        "the input is closed, so the batch is over"
+    );
 }

@@ -16,15 +16,19 @@ mod parser;
 mod parsers;
 mod registry;
 mod render;
+mod template;
 
-pub use batch::{BatchItem, Results};
-pub use extraction::{Extracted, Extraction, Options, SourceDocument, Warning, DEFAULT_MAX_SIZE};
+pub use batch::{BatchItem, Results, Source, Timeout};
+pub use extraction::{
+    Extracted, Extraction, Inventory, Options, SourceDocument, Warning, DEFAULT_MAX_SIZE,
+};
 pub use failure::Failure;
 pub use format::{Confidence, Format};
 pub use metadata::{DocumentMetadata, FileMetadata};
 pub use parser::Parser;
 pub use registry::Registry;
-pub use render::to_jsonl;
+pub use render::{to_jsonl, to_markdown, FrontMatter, Record};
+pub use template::{OutputTemplate, TemplateError};
 
 use std::path::PathBuf;
 use std::sync::{Arc, OnceLock};
@@ -46,7 +50,16 @@ fn default_registry() -> &'static Arc<Registry> {
 /// Failure, so that one bad document in a Batch of a million interrupts
 /// nothing.
 pub fn extract(source: SourceDocument<'_>, options: &Options) -> Result<Extraction, Failure> {
-    default_registry().extract(source, options)
+    batch::guarded(|| default_registry().extract(source, options))
+}
+
+/// Read what one Source Document declares about itself, without parsing its
+/// body.
+///
+/// The same detection as [`extract`], and none of the extraction: the body
+/// is where the time goes, and every format keeps its metadata apart from it.
+pub fn inventory(source: SourceDocument<'_>, options: &Options) -> Result<Inventory, Failure> {
+    batch::guarded(|| default_registry().inventory(source, options))
 }
 
 /// Identify a Source Document by polling the built-in Parsers.
@@ -57,6 +70,21 @@ pub fn detect_format(source: &SourceDocument<'_>) -> Result<Format, Failure> {
 /// Look a built-in Supported Format up by id, case-insensitively.
 pub fn format_from_id(id: &str) -> Option<Format> {
     default_registry().format_from_id(id)
+}
+
+/// Extract one Source Document from wherever it is, exactly as a Batch
+/// would: a path is read under the size cap and with its modification time,
+/// bytes are taken as they are, and a Parser that panics costs a Failure
+/// rather than the process. The result is labelled the way the caller
+/// referred to the document, as it would be in a Batch.
+pub fn extract_source(source: Source, options: &Options) -> BatchItem {
+    batch::extract_source(default_registry(), source, options)
+}
+
+/// Inventory one Source Document from wherever it is, exactly as a Batch
+/// would.
+pub fn inventory_source(source: Source, options: &Options) -> BatchItem<Inventory> {
+    batch::inventory_source(default_registry(), source, options)
 }
 
 /// Extract many Source Documents at once, reading each from its path.
@@ -74,4 +102,47 @@ where
     I::IntoIter: Send,
 {
     batch::extract_paths(Arc::clone(default_registry()), paths, options, workers)
+}
+
+/// Extract many Source Documents at once, wherever each comes from: the same
+/// Batch as [`extract_paths`], over paths and bytes alike.
+///
+/// This is the road in for a caller who does not have a filesystem — one
+/// draining an object store, say — and it is why the input is an iterator
+/// rather than a collection: the documents can be fetched as the Batch asks
+/// for them, and no more than the queue holds are ever in memory at once.
+pub fn extract_sources<I>(sources: I, options: &Options, workers: Option<usize>) -> Results
+where
+    I: IntoIterator<Item = Source> + Send + 'static,
+    I::IntoIter: Send,
+{
+    batch::extract_sources(Arc::clone(default_registry()), sources, options, workers)
+}
+
+/// Inventory many Source Documents at once, wherever each comes from: the
+/// same Batch as [`extract_sources`], reading metadata alone.
+pub fn inventory_sources<I>(
+    sources: I,
+    options: &Options,
+    workers: Option<usize>,
+) -> Results<Inventory>
+where
+    I: IntoIterator<Item = Source> + Send + 'static,
+    I::IntoIter: Send,
+{
+    batch::inventory_sources(Arc::clone(default_registry()), sources, options, workers)
+}
+
+/// Inventory many Source Documents at once: the same Batch as
+/// [`extract_paths`], the same iterator out, reading metadata alone.
+///
+/// An order of magnitude faster than extraction on the same corpus, which is
+/// what makes it worth having: it turns "inventory three terabytes" from an
+/// overnight job into a coffee break.
+pub fn inventory_paths<I>(paths: I, options: &Options, workers: Option<usize>) -> Results<Inventory>
+where
+    I: IntoIterator<Item = PathBuf> + Send + 'static,
+    I::IntoIter: Send,
+{
+    batch::inventory_paths(Arc::clone(default_registry()), paths, options, workers)
 }

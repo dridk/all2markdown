@@ -6,3 +6,10 @@ resolver = "2"
 version = "0.1.0"
 edition = "2021"
 license = "MIT"
+
+# Dependencies optimised even in dev: the parsers do all the work, and a test
+# that measures how much faster an Inventory is than an Extraction must see
+# the parsers as they ship, not as they debug. This crate's own code stays
+# unoptimised, so a debugger still steps through it.
+[profile.dev.package."*"]
+opt-level = 3
