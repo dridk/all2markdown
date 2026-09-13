@@ -36,7 +36,13 @@ all2markdown ./corpus -o ./out -j 8           # a directory, one .md per documen
 all2markdown ./corpus -o ./out -t '{stem}-{format}.md' --no-front-matter
 all2markdown ./corpus -j 8 --jsonl > out.jsonl  # a directory, as JSONL on stdout
 all2markdown ./corpus --metadata-only > inventory.jsonl  # metadata alone, no body parsed
+find ./corpus -name '*.docx' | all2markdown --paths-from - -o ./out  # a list of paths, recursion is find's
+curl -s https://store/report.docx | all2markdown - --name report.docx > out.md  # a document on stdin
 ```
+
+Exit codes: 0 every document extracted; 1 the command failed or the one
+document asked for could not be read; 2 the arguments were refused; 3 the
+batch ran to its end and some of its documents failed.
 
 ## Architecture
 
@@ -71,8 +77,17 @@ Current state, being reshaped by milestone 1:
   parsed once at startup so an unknown variable is refused before any document
   is read. The default `{name}.md` keeps the source extension, which is what
   makes `report.doc` and `report.pdf` unable to overwrite one another.
-- The CLI requires `-o <DIR>` for a directory unless `--jsonl`; a single
-  document goes to stdout. `-o` may never be the source directory.
+- The CLI requires `-o <DIR>` for a directory or a path list unless `--jsonl`;
+  a single document goes to stdout. `-o` may never be the source directory.
+- The CLI's `Input` is decided by the arguments alone, never by peeking at
+  stdin: `-` is a document on stdin, `--paths-from FILE` (`-` for stdin) is a
+  list of paths, one per line, streamed into the Batch as it is read. A stdin
+  document is the one thing that bypasses `batch.rs`: it is read whole under
+  the same size cap, then handed to `extract`/`inventory`. `--name` gives it
+  the name detection and the front matter need; `-o` is refused for it.
+- Progress is one line on stderr, redrawn in place, only when stderr is a
+  terminal; warnings and per-document errors go to stderr in every mode, so
+  piped stdout carries nothing but Markdown or JSONL.
 - DOCX parser skips `RunChild::Drawing` and `RunChild::Shape` to exclude
   textbox text
 - DOC uses `unword`, DOCX uses `docx-rs`, RTF uses `rtf-parser`, PDF uses
